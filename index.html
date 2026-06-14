@@ -1145,26 +1145,75 @@
     }
 
     function parseSMS(text) {
-        const patterns = [
-            // Padrão genérico AED - aceita qualquer número de cartão
-            /(?:AED|aed)\s*([\d,\.]+).*?on\s+([\d\/]+)\s+([\d:]+).*?at\s+([^,]+)/i,
-            // Padrão R$/USD/EUR
-            /(?:R\$|USD|EUR)\s*([\d,\.]+).*?(\d{2}\/\d{2}\/\d{4}).*?(\d{2}:\d{2}:\d{2}).*?(?:at|em)\s+([^,\.]+)/i,
-            // Padrão alternativo para diferentes formatos
-            /(?:valor|value|amount).*?([\d,\.]+).*?(?:data|date).*?(\d{2}\/\d{2}\/\d{4}).*?(\d{2}:\d{2}:\d{2}).*?(?:estabelecimento|merchant).*?([^\n]+)/i,
-        ];
-        for (let p of patterns) {
-            const m = text.match(p);
-            if (m) {
-                return {
-                    amount: parseFloat(m[1].replace(',', '')),
-                    date: m[2],
-                    time: m[3],
-                    merchant: m[4].trim(),
-                    id: Date.now()
-                };
-            }
+        // Helpers para data/hora atual
+        function todayDate() {
+            const d = new Date();
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const yyyy = d.getFullYear();
+            return `${dd}/${mm}/${yyyy}`;
         }
+        function nowTime() {
+            const d = new Date();
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mi = String(d.getMinutes()).padStart(2, '0');
+            const ss = String(d.getSeconds()).padStart(2, '0');
+            return `${hh}:${mi}:${ss}`;
+        }
+
+        // Padrão 1: "Purchase of AED 355.00 with Credit Card ending 3783 at MIYABI SUSHI, DUBAI"
+        // Sem data — usa data/hora atual
+        const p1 = /Purchase of AED\s*([\d,\.]+).*?at\s+([^,]+)/i;
+        const m1 = text.match(p1);
+        if (m1) {
+            return {
+                amount: parseFloat(m1[1].replace(/,/g, '')),
+                date: todayDate(),
+                time: nowTime(),
+                merchant: m1[2].trim(),
+                id: Date.now()
+            };
+        }
+
+        // Padrão 2: genérico AED com data e hora no SMS
+        const p2 = /(?:AED|aed)\s*([\d,\.]+).*?on\s+([\d\/]+)\s+([\d:]+).*?at\s+([^,]+)/i;
+        const m2 = text.match(p2);
+        if (m2) {
+            return {
+                amount: parseFloat(m2[1].replace(/,/g, '')),
+                date: m2[2],
+                time: m2[3],
+                merchant: m2[4].trim(),
+                id: Date.now()
+            };
+        }
+
+        // Padrão 3: R$/USD/EUR com data e hora
+        const p3 = /(?:R\$|USD|EUR)\s*([\d,\.]+).*?(\d{2}\/\d{2}\/\d{4}).*?(\d{2}:\d{2}:\d{2}).*?(?:at|em)\s+([^,\.]+)/i;
+        const m3 = text.match(p3);
+        if (m3) {
+            return {
+                amount: parseFloat(m3[1].replace(/,/g, '')),
+                date: m3[2],
+                time: m3[3],
+                merchant: m3[4].trim(),
+                id: Date.now()
+            };
+        }
+
+        // Padrão 4: formato valor/data/estabelecimento genérico
+        const p4 = /(?:valor|value|amount).*?([\d,\.]+).*?(?:data|date).*?(\d{2}\/\d{2}\/\d{4}).*?(\d{2}:\d{2}:\d{2}).*?(?:estabelecimento|merchant).*?([^\n]+)/i;
+        const m4 = text.match(p4);
+        if (m4) {
+            return {
+                amount: parseFloat(m4[1].replace(/,/g, '')),
+                date: m4[2],
+                time: m4[3],
+                merchant: m4[4].trim(),
+                id: Date.now()
+            };
+        }
+
         return null;
     }
 
