@@ -1144,6 +1144,28 @@
         }
     }
 
+    function showToast(msg, type = 'success') {
+        let toast = document.getElementById('appToast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'appToast';
+            toast.style.cssText = `
+                position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+                padding: 14px 24px; border-radius: 10px; font-size: 0.95rem;
+                font-weight: 600; z-index: 9999; opacity: 0;
+                transition: opacity 0.3s ease; pointer-events: none;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.4); max-width: 90vw; text-align: center;
+            `;
+            document.body.appendChild(toast);
+        }
+        toast.textContent = msg;
+        toast.style.background = type === 'success' ? '#22c55e' : '#ef4444';
+        toast.style.color = '#fff';
+        toast.style.opacity = '1';
+        clearTimeout(toast._timeout);
+        toast._timeout = setTimeout(() => { toast.style.opacity = '0'; }, 3000);
+    }
+
     function parseSMS(text) {
         // Helpers para data/hora atual
         function todayDate() {
@@ -1275,10 +1297,10 @@
             state.sms = '';
             state.obs = '';
             state.selectedCategory = null;
-            alert('✅ Despesa salva automaticamente no Google Sheets!');
             render();
+            showToast('✅ Despesa salva no Google Sheets!');
         } else {
-            alert('❌ Erro ao salvar. Tente novamente.');
+            showToast('❌ Erro ao salvar. Tente novamente.', 'error');
         }
     }
 
