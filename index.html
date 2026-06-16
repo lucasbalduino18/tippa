@@ -1260,6 +1260,12 @@
         }
 
         const success = await addExpenseToSheets(parsed);
+
+        // Sempre reabilitar o botão, independente do resultado
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Extrair e Adicionar';
+        }
         
         if (success) {
             // ✅ OTIMIZAÇÃO: Atualizar state localmente sem recarregar tudo do servidor
@@ -1273,10 +1279,6 @@
             render();
         } else {
             alert('❌ Erro ao salvar. Tente novamente.');
-            if (btn) {
-                btn.disabled = false;
-                btn.textContent = 'Extrair e Adicionar';
-            }
         }
     }
 
