@@ -1408,17 +1408,17 @@
             });
         }
         
-        let html = '<div style="background: #00D4AA; ';
-        html += 'border-radius: 20px; max-width: 500px; max-height: 80vh; overflow: hidden; ';
-        html += 'box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">';
+        let html = '<div style="background: #0F1729; border: 1px solid rgba(255,255,255,0.08); ';
+        html += 'border-radius: 16px; max-width: 500px; max-height: 80vh; overflow: hidden; ';
+        html += 'box-shadow: 0 24px 60px rgba(0,0,0,0.6);">';
         
         // Header
-        html += '<div style="padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); ';
+        html += '<div style="padding: 18px 20px; border-bottom: 1px solid rgba(255,255,255,0.07); ';
         html += 'display: flex; justify-content: space-between; align-items: center;">';
-        html += '<h3 style="margin: 0; color: white;">💰 Gerenciar Rendimentos</h3>';
+        html += '<h3 style="margin: 0; color: #F0F4FF; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.04em;">💰 Gerir Rendimentos</h3>';
         html += '<button onclick="this.closest(' + "'.modal-overlay').remove()" + '" ';
-        html += 'style="background: rgba(255,255,255,0.2); border: none; color: white; ';
-        html += 'width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 1.2rem;">×</button>';
+        html += 'style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #94A3B8; ';
+        html += 'width: 30px; height: 30px; border-radius: 8px; cursor: pointer; font-size: 1rem;">×</button>';
         html += '</div>';
         
         // Lista de meses
@@ -2789,17 +2789,17 @@
         
         modal.innerHTML = `
             <div style="
-                background: #00D4AA;
-                border-radius: 20px;
-                max-width: 500px;
+                background: #0F1729;
+                border: 1px solid rgba(255,255,255,0.08);
+                border-radius: 16px;
                 width: 100%;
                 max-height: 80vh;
                 overflow-y: auto;
                 padding: 25px;
-                color: white;
-                box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+                color: #F0F4FF;
+                box-shadow: 0 24px 60px rgba(0,0,0,0.6);
             ">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
                     <div>
                         <h3 style="margin: 0; font-size: 1.3rem;">
                             ${category.icon} ${category.name}
@@ -2811,13 +2811,13 @@
                         ` : ''}
                     </div>
                     <button onclick="this.closest('.modal-overlay').remove()" style="
-                        background: rgba(255,255,255,0.2);
-                        border: none;
-                        color: white;
+                        background: rgba(255,255,255,0.06);
+                        border: 1px solid rgba(255,255,255,0.1);
+                        color: #94A3B8;
                         width: 32px;
                         height: 32px;
-                        border-radius: 50%;
-                        font-size: 20px;
+                        border-radius: 8px;
+                        font-size: 18px;
                         cursor: pointer;
                         display: flex;
                         align-items: center;
@@ -2844,7 +2844,7 @@
                         gap: 10px;
                         margin-top: 15px;
                         padding-top: 15px;
-                        border-top: 1px solid rgba(255,255,255,0.2);
+                        border-top: 1px solid rgba(255,255,255,0.07);
                     ">
                         ${(() => {
                             const amounts = categoryExpenses.map(e => parseFloat(e.amount) || 0);
@@ -2854,24 +2854,24 @@
                             
                             return `
                                 <div style="text-align: center;">
-                                    <div style="font-size: 0.7rem; opacity: 0.7; margin-bottom: 3px;">Média</div>
-                                    <div style="font-size: 0.95rem; font-weight: 700;">AED ${avgAmount.toFixed(2)}</div>
+                                    <div style="font-size: 0.68rem; color: #94A3B8; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.05em;">Média</div>
+                                    <div style="font-size: 0.9rem; font-weight: 700; font-variant-numeric: tabular-nums;">AED ${avgAmount.toFixed(2)}</div>
                                 </div>
                                 <div style="text-align: center;">
-                                    <div style="font-size: 0.7rem; opacity: 0.7; margin-bottom: 3px;">Maior</div>
-                                    <div style="font-size: 0.95rem; font-weight: 700; color: #fca5a5;">AED ${maxAmount.toFixed(2)}</div>
+                                    <div style="font-size: 0.68rem; color: #94A3B8; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.05em;">Maior</div>
+                                    <div style="font-size: 0.9rem; font-weight: 700; font-variant-numeric: tabular-nums; color: #EF4444;">AED ${maxAmount.toFixed(2)}</div>
                                 </div>
                                 <div style="text-align: center;">
-                                    <div style="font-size: 0.7rem; opacity: 0.7; margin-bottom: 3px;">Menor</div>
-                                    <div style="font-size: 0.95rem; font-weight: 700; color: #86efac;">AED ${minAmount.toFixed(2)}</div>
+                                    <div style="font-size: 0.68rem; color: #94A3B8; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.05em;">Menor</div>
+                                    <div style="font-size: 0.9rem; font-weight: 700; font-variant-numeric: tabular-nums; color: #00D4AA;">AED ${minAmount.toFixed(2)}</div>
                                 </div>
                             `;
                         })()}
                     </div>
                 </div>
                 
-                <h4 style="margin-bottom: 15px; font-size: 1rem; opacity: 0.9;">
-                    🏪 Estabelecimentos:
+                <h4 style="margin-bottom: 12px; font-size: 0.78rem; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.07em;">
+                    🏪 Estabelecimentos
                 </h4>
                 
                 <div style="display: flex; flex-direction: column; gap: 10px;">
@@ -2885,14 +2885,14 @@
                                 border: 1px solid rgba(255,255,255,0.07);
                             ">
                                 <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
-                                    <div style="flex: 1; font-weight: 600; font-size: 0.95rem;">
+                                    <div style="flex: 1; font-weight: 600; font-size: 0.9rem; color: #F0F4FF;">
                                         ${merchant.name}
                                     </div>
                                     <div style="text-align: right;">
-                                        <div style="font-size: 1.1rem; font-weight: 700;">
+                                        <div style="font-size: 1rem; font-weight: 700; font-variant-numeric: tabular-nums; color: #F0F4FF;">
                                             AED ${merchant.total.toFixed(2)}
                                         </div>
-                                        <div style="font-size: 0.75rem; opacity: 0.7;">
+                                        <div style="font-size: 0.72rem; color: #94A3B8;">
                                             ${merchant.count} ${merchant.count === 1 ? 'vez' : 'vezes'}
                                         </div>
                                     </div>
@@ -2902,10 +2902,10 @@
                                 <div style="
                                     width: 100%;
                                     height: 6px;
-                                    background: rgba(255,255,255,0.2);
-                                    border-radius: 3px;
+                                    background: rgba(255,255,255,0.06);
+                                    border-radius: 2px;
                                     overflow: hidden;
-                                    margin-bottom: 5px;
+                                    margin-bottom: 4px;
                                 ">
                                     <div style="
                                         height: 100%;
@@ -2915,7 +2915,7 @@
                                     "></div>
                                 </div>
                                 
-                                <div style="font-size: 0.75rem; opacity: 0.7; text-align: right;">
+                                <div style="font-size: 0.7rem; color: #4E627A; text-align: right;">
                                     ${percentage.toFixed(1)}% do total
                                 </div>
                             </div>
