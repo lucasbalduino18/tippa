@@ -10,574 +10,505 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Inter', -apple-system, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #fff;
-            min-height: 100vh;
-            padding: 20px;
-            padding-bottom: 100px;
-        }
-        .container { max-width: 500px; margin: 0 auto; }
-        h1 { font-size: 2rem; margin-bottom: 30px; text-align: center; }
-        .card {
-            background: rgba(255,255,255,0.15);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 25px;
-            margin-bottom: 20px;
-            border: 1px solid rgba(255,255,255,0.2);
-        }
-        .balance {
-            text-align: center;
-            font-size: 3rem;
-            font-weight: 700;
-            margin: 20px 0;
-            text-shadow: 0 2px 10px rgba(0,0,0,0.2);
-        }
-        .meta {
-            display: flex;
-            justify-content: space-around;
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 1px solid rgba(255,255,255,0.3);
-        }
-        .meta-item { text-align: center; }
-        .meta-label { font-size: 0.8rem; opacity: 0.8; margin-bottom: 5px; }
-        .meta-value { font-size: 1.3rem; font-weight: 700; }
-        .tabs {
-            display: flex;
-            gap: 5px;
-            margin-bottom: 20px;
-            overflow-x: auto;
-            overflow-y: hidden;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none;
-            -ms-overflow-style: none;
-            padding-bottom: 5px;
-        }
-        .tabs::-webkit-scrollbar {
-            display: none;
-        }
-        .tab {
-            flex: 1;
-            min-width: fit-content;
-            padding: 10px 6px;
-            background: rgba(255,255,255,0.2);
-            border: none;
-            border-radius: 10px;
-            color: #fff;
-            font-weight: 600;
-            cursor: pointer;
-            transition: 0.3s;
-            font-size: 0.65rem;
-            white-space: nowrap;
-        }
-        .tab.active {
-            background: rgba(255,255,255,0.95);
-            color: #667eea;
-        }
-        .input-group { margin-bottom: 15px; }
-        .label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            font-size: 0.9rem;
-        }
-        input, textarea, select {
-            width: 100%;
-            padding: 12px;
-            background: rgba(255,255,255,0.9);
-            border: none;
-            border-radius: 10px;
-            font-size: 1rem;
-            color: #333;
-            font-family: inherit;
-        }
-        input[type="date"], input[type="time"] {
-            color-scheme: dark;
-        }
-        input[type="date"]::-webkit-calendar-picker-indicator,
-        input[type="time"]::-webkit-calendar-picker-indicator {
-            filter: invert(1);
-        }
-        textarea {
-            min-height: 100px;
-            resize: vertical;
-        }
-        .btn {
-            width: 100%;
-            padding: 15px;
-            background: rgba(255,255,255,0.95);
-            border: none;
-            border-radius: 12px;
-            color: #667eea;
-            font-size: 1rem;
-            font-weight: 700;
-            cursor: pointer;
-            margin-top: 10px;
-        }
-        .btn:active { transform: scale(0.98); }
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
+    /* ============================================
+       DESIGN SYSTEM — COCKPIT NIGHT MODE
+       Palette: deep navy base, teal accent, amber alert
+    ============================================ */
+    :root {
+        --bg:          #080D1A;
+        --surface:     #0F1729;
+        --surface-2:   #162035;
+        --surface-3:   #1E2A3A;
+        --border:      rgba(255,255,255,0.07);
+        --border-2:    rgba(255,255,255,0.12);
+        --teal:        #00D4AA;
+        --teal-dim:    rgba(0,212,170,0.12);
+        --teal-mid:    rgba(0,212,170,0.25);
+        --amber:       #F59E0B;
+        --amber-dim:   rgba(245,158,11,0.15);
+        --red:         #EF4444;
+        --red-dim:     rgba(239,68,68,0.15);
+        --green:       #22C55E;
+        --green-dim:   rgba(34,197,94,0.12);
+        --purple:      #8B5CF6;
+        --text-1:      #F0F4FF;
+        --text-2:      #94A3B8;
+        --text-3:      #4E627A;
+        --radius-sm:   8px;
+        --radius-md:   12px;
+        --radius-lg:   16px;
+    }
 
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
-    /* Estilos para seleção de categoria */
+    body {
+        font-family: 'Inter', -apple-system, sans-serif;
+        background: var(--bg);
+        color: var(--text-1);
+        min-height: 100vh;
+        padding: 20px;
+        padding-bottom: 100px;
+        /* Subtle grid texture */
+        background-image:
+            linear-gradient(rgba(0,212,170,0.015) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(0,212,170,0.015) 1px, transparent 1px);
+        background-size: 40px 40px;
+    }
+
+    .container { max-width: 500px; margin: 0 auto; }
+
+    h1 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--text-1);
+        margin-bottom: 24px;
+    }
+
+    /* ── CARDS ─────────────────────────────── */
+    .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 20px;
+        margin-bottom: 16px;
+        position: relative;
+        overflow: hidden;
+    }
+    /* Teal left-edge accent on cards */
+    .card::before {
+        content: '';
+        position: absolute;
+        left: 0; top: 12px; bottom: 12px;
+        width: 3px;
+        background: var(--teal);
+        border-radius: 0 3px 3px 0;
+        opacity: 0.6;
+    }
+
+    .balance {
+        text-align: center;
+        font-size: 2.6rem;
+        font-weight: 700;
+        margin: 16px 0;
+        font-variant-numeric: tabular-nums;
+        color: var(--text-1);
+        letter-spacing: -0.01em;
+    }
+
+    .meta {
+        display: flex;
+        justify-content: space-around;
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid var(--border);
+    }
+    .meta-item { text-align: center; }
+    .meta-label { font-size: 0.75rem; color: var(--text-2); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.06em; }
+    .meta-value { font-size: 1.2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+    /* ── TABS ─────────────────────────────── */
+    .tabs {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 20px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        padding-bottom: 4px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: 4px;
+    }
+    .tabs::-webkit-scrollbar { display: none; }
+
+    .tab {
+        flex: 1;
+        min-width: fit-content;
+        padding: 9px 8px;
+        background: transparent;
+        border: none;
+        border-radius: var(--radius-sm);
+        color: var(--text-2);
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 0.65rem;
+        white-space: nowrap;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+    }
+    .tab:hover { color: var(--text-1); background: var(--surface-3); }
+    .tab.active {
+        background: var(--teal);
+        color: #080D1A;
+        font-weight: 700;
+    }
+
+    /* ── INPUTS ───────────────────────────── */
+    .input-group { margin-bottom: 14px; }
+    .label {
+        display: block;
+        margin-bottom: 7px;
+        font-weight: 600;
+        font-size: 0.8rem;
+        color: var(--text-2);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+    }
+    input, textarea, select {
+        width: 100%;
+        padding: 11px 14px;
+        background: var(--surface-2);
+        border: 1px solid var(--border-2);
+        border-radius: var(--radius-sm);
+        font-size: 0.95rem;
+        color: var(--text-1);
+        font-family: inherit;
+        transition: border-color 0.2s;
+    }
+    input:focus, textarea:focus, select:focus {
+        outline: none;
+        border-color: var(--teal);
+        background: var(--surface-3);
+    }
+    input[type="date"], input[type="time"] { color-scheme: dark; }
+    input[type="date"]::-webkit-calendar-picker-indicator,
+    input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(0.6); }
+
+    textarea { min-height: 90px; resize: vertical; }
+
+    select option { background: var(--surface-2); color: var(--text-1); }
+
+    /* ── BUTTONS ─────────────────────────── */
+    .btn {
+        width: 100%;
+        padding: 13px;
+        background: var(--teal);
+        border: none;
+        border-radius: var(--radius-sm);
+        color: #080D1A;
+        font-size: 0.9rem;
+        font-weight: 700;
+        cursor: pointer;
+        margin-top: 10px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        transition: all 0.2s;
+    }
+    .btn:hover { background: #00E8BB; }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .btn-secondary {
+        background: var(--surface-3);
+        color: var(--text-1);
+        border: 1px solid var(--border-2);
+    }
+    .btn-secondary:hover { background: var(--surface-2); }
+
+    /* ── CATEGORY GRID ───────────────────── */
     .category-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
-        gap: 10px;
+        gap: 8px;
         margin-top: 10px;
     }
     .category-option {
-        background: rgba(255,255,255,0.1);
-        padding: 15px 10px;
-        border-radius: 12px;
-        border: 2px solid transparent;
+        background: var(--surface-2);
+        padding: 12px 8px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border);
         cursor: pointer;
-        transition: all 0.3s;
+        transition: all 0.2s;
         text-align: center;
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
     }
-    .category-option:hover {
-        background: rgba(255,255,255,0.15);
-        transform: scale(1.05);
-    }
-    .category-option:active {
-        transform: scale(0.95);
-    }
+    .category-option:hover { background: var(--surface-3); border-color: var(--border-2); }
+    .category-option:active { transform: scale(0.96); }
     .category-option.selected {
-        background: rgba(255,255,255,0.2);
-        border-width: 3px;
+        background: var(--teal-dim);
+        border-color: var(--teal);
     }
-    .category-icon {
-        font-size: 2rem;
-    }
-    .category-name {
-        font-size: 0.75rem;
-        font-weight: 600;
-    }
-    .btn-secondary {
-        background: rgba(255,255,255,0.2);
-        color: #fff;
-        border: 1px solid rgba(255,255,255,0.3);
-    }
+    .category-icon { font-size: 1.6rem; }
+    .category-name { font-size: 0.7rem; font-weight: 600; color: var(--text-2); }
+    .category-option.selected .category-name { color: var(--teal); }
+
+    /* ── EXPENSE LIST ─────────────────────── */
     .expense-item {
-        background: rgba(255,255,255,0.08);
-        border-radius: 12px;
-        padding: 15px;
-        margin-bottom: 10px;
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 12px 14px;
+        margin-bottom: 8px;
         display: flex;
         justify-content: space-between;
         align-items: center;
+        transition: border-color 0.2s;
     }
+    .expense-item:hover { border-color: var(--border-2); }
     .expense-info { flex: 1; }
-    .expense-merchant { font-weight: 600; margin-bottom: 5px; }
-    .expense-date { font-size: 0.85rem; opacity: 0.8; }
+    .expense-merchant { font-weight: 600; margin-bottom: 3px; font-size: 0.95rem; }
+    .expense-date { font-size: 0.78rem; color: var(--text-2); }
     .expense-category {
         display: inline-block;
-        padding: 4px 10px;
-        border-radius: 12px;
-        font-size: 0.75rem;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 0.7rem;
         font-weight: 600;
-        margin-top: 5px;
+        margin-top: 4px;
+        opacity: 0.85;
     }
-    .expense-amount { font-size: 1.3rem; font-weight: 700; }
+    .expense-amount {
+        font-size: 1.1rem;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        color: var(--text-1);
+    }
     .delete-btn {
-        background: rgba(239, 68, 68, 0.2);
-        border: none;
-        color: #fff;
-        padding: 8px 12px;
-        border-radius: 8px;
-        margin-left: 10px;
+        background: var(--red-dim);
+        border: 1px solid rgba(239,68,68,0.2);
+        color: var(--red);
+        padding: 7px 10px;
+        border-radius: var(--radius-sm);
+        margin-left: 8px;
         cursor: pointer;
+        font-size: 0.8rem;
+        transition: all 0.2s;
     }
+    .delete-btn:hover { background: rgba(239,68,68,0.25); }
+    .edit-btn {
+        background: rgba(59,130,246,0.12);
+        border: 1px solid rgba(59,130,246,0.2);
+        color: #60A5FA;
+        padding: 7px 10px;
+        border-radius: var(--radius-sm);
+        margin-left: 8px;
+        cursor: pointer;
+        font-size: 0.8rem;
+        transition: all 0.2s;
+    }
+    .edit-btn:hover { background: rgba(59,130,246,0.22); }
+
+    /* ── PROGRESS BARS ────────────────────── */
     .progress-bar {
         width: 100%;
-        height: 10px;
-        background: rgba(0,0,0,0.2);
-        border-radius: 10px;
+        height: 6px;
+        background: var(--surface-3);
+        border-radius: 3px;
         overflow: hidden;
-        margin: 15px 0;
+        margin: 12px 0;
     }
     .progress-fill {
         height: 100%;
-        background: linear-gradient(90deg, #4ade80, #22c55e);
-        border-radius: 10px;
+        background: var(--teal);
+        border-radius: 3px;
         transition: width 0.5s;
     }
-    .progress-fill.warning { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
-    .progress-fill.danger { background: linear-gradient(90deg, #ef4444, #dc2626); }
-    .empty { text-align: center; padding: 40px; opacity: 0.7; }
-    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px; }
+    .progress-fill.warning { background: var(--amber); }
+    .progress-fill.danger { background: var(--red); }
+
+    /* ── STATS GRID ──────────────────────── */
+    .empty { text-align: center; padding: 40px; color: var(--text-3); }
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
     .stat-card {
-        background: rgba(255,255,255,0.1);
-        padding: 15px;
-        border-radius: 12px;
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        padding: 14px;
+        border-radius: var(--radius-sm);
         text-align: center;
     }
-    .stat-label { font-size: 0.8rem; opacity: 0.8; margin-bottom: 5px; }
-    .stat-value { font-size: 1.5rem; font-weight: 700; }
-    .month-group { margin-bottom: 25px; }
+    .stat-label { font-size: 0.72rem; color: var(--text-2); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.06em; }
+    .stat-value { font-size: 1.3rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+    /* ── MONTH HISTORY ────────────────────── */
+    .month-group { margin-bottom: 20px; }
     .month-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 12px 20px;
-        background: rgba(255,255,255,0.1);
-        border-radius: 12px;
+        padding: 11px 16px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
         font-weight: 700;
-        font-size: 1.1rem;
-        margin-bottom: 12px;
-        backdrop-filter: blur(5px);
+        font-size: 0.95rem;
+        margin-bottom: 8px;
         cursor: pointer;
-        transition: 0.3s;
+        transition: all 0.2s;
     }
-    .month-header:hover {
-        background: rgba(255,255,255,0.15);
-    }
-    .month-header:active {
-        transform: scale(0.98);
-    }
-    .month-toggle {
-        font-size: 1.2rem;
-        transition: transform 0.3s;
-    }
-    .month-toggle.expanded {
-        transform: rotate(180deg);
-    }
-    .month-expenses {
-        max-height: 0;
-        overflow: hidden;
-        transition: max-height 0.3s ease-out;
-    }
-    .month-expenses.expanded {
-        max-height: 600px;
-        overflow-y: auto;
-        overflow-x: hidden;
-    }
-    .expand-controls {
-        display: flex;
-        gap: 10px;
-        margin-bottom: 15px;
-    }
+    .month-header:hover { border-color: var(--teal); background: var(--surface-2); }
+    .month-header:active { transform: scale(0.99); }
+    .month-toggle { font-size: 1rem; transition: transform 0.3s; color: var(--text-2); }
+    .month-toggle.expanded { transform: rotate(180deg); }
+    .month-expenses { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
+    .month-expenses.expanded { max-height: 600px; overflow-y: auto; overflow-x: hidden; }
+    .expand-controls { display: flex; gap: 8px; margin-bottom: 14px; }
     .expand-controls button {
         flex: 1;
-        padding: 10px;
-        background: rgba(255,255,255,0.2);
-        border: none;
-        border-radius: 10px;
-        color: #fff;
-        font-size: 0.85rem;
+        padding: 9px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        color: var(--text-2);
+        font-size: 0.8rem;
         cursor: pointer;
-        transition: 0.3s;
+        transition: all 0.2s;
+        letter-spacing: 0.03em;
     }
-    .expand-controls button:hover {
-        background: rgba(255,255,255,0.3);
-    }
+    .expand-controls button:hover { border-color: var(--teal); color: var(--teal); }
+
+    /* ── RITMO / GAUGE ────────────────────── */
     .ritmo-card {
-        background: var(--secondary);
-        border-radius: 20px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
         padding: 20px;
-        margin-bottom: 20px;
-    }
-    .ritmo-header {
-        text-align: center;
-        margin-bottom: 20px;
-    }
-    .ritmo-title {
-        font-size: 1rem;
-        opacity: 0.9;
-        margin-bottom: 10px;
-    }
-    .ritmo-gauge {
+        margin-bottom: 16px;
         position: relative;
-        width: 100%;
-        margin: 15px 0 10px 0;
+        overflow: hidden;
     }
+    .ritmo-card::before {
+        content: '';
+        position: absolute;
+        left: 0; top: 12px; bottom: 12px;
+        width: 3px;
+        background: var(--amber);
+        border-radius: 0 3px 3px 0;
+        opacity: 0.7;
+    }
+    .ritmo-header { text-align: center; margin-bottom: 16px; }
+    .ritmo-title { font-size: 0.8rem; color: var(--text-2); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.07em; }
+    .ritmo-gauge { position: relative; width: 100%; margin: 12px 0 8px 0; }
     .ritmo-bar {
         position: relative;
         width: 100%;
-        height: 30px;
-        background: rgba(255,255,255,0.1);
-        border-radius: 15px;
+        height: 24px;
+        background: var(--surface-3);
+        border-radius: 4px;
         overflow: hidden;
+        border: 1px solid var(--border);
     }
     .ritmo-fill {
         height: 100%;
-        border-radius: 15px;
+        border-radius: 4px;
         transition: width 0.5s, background-color 0.5s;
         display: flex;
         align-items: center;
         justify-content: flex-end;
-        padding-right: 15px;
+        padding-right: 10px;
         font-weight: 700;
-        font-size: 0.9rem;
+        font-size: 0.8rem;
+        color: #080D1A;
     }
     .ritmo-markers {
         position: relative;
-        margin-top: 8px;
-        font-size: 0.75rem;
-        opacity: 0.7;
-        height: 15px;
+        margin-top: 6px;
+        font-size: 0.68rem;
+        color: var(--text-3);
+        height: 14px;
     }
-    .ritmo-markers span {
-        position: absolute;
-        transform: translateX(-50%);
-    }
-    .ritmo-markers span:nth-child(1) { left: 0%; }      /* 0% */
-    .ritmo-markers span:nth-child(2) { left: 53.33%; }  /* 80% de 150% = 53.33% */
-    .ritmo-markers span:nth-child(3) { left: 66.67%; }  /* 100% de 150% = 66.67% */
-    .ritmo-markers span:nth-child(4) { left: 80%; }     /* 120% de 150% = 80% */
-    .ritmo-markers span:nth-child(5) { left: 100%; transform: translateX(-100%); }    /* 150% = 100% */
-    .ritmo-status {
-        text-align: center;
-        margin-top: 10px;
-    }
-    .ritmo-status-emoji {
-        font-size: 2.5rem;
-        margin-bottom: 5px;
-    }
-    .ritmo-status-text {
-        font-size: 1.2rem;
-        font-weight: 700;
-        margin-bottom: 5px;
-    }
-    .ritmo-status-desc {
-        font-size: 0.85rem;
-        opacity: 0.8;
-    }
-    .ritmo-details {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 15px;
-        margin-top: 20px;
-    }
+    .ritmo-markers span { position: absolute; transform: translateX(-50%); }
+    .ritmo-markers span:nth-child(1) { left: 0%; }
+    .ritmo-markers span:nth-child(2) { left: 53.33%; }
+    .ritmo-markers span:nth-child(3) { left: 66.67%; }
+    .ritmo-markers span:nth-child(4) { left: 80%; }
+    .ritmo-markers span:nth-child(5) { left: 100%; transform: translateX(-100%); }
+    .ritmo-status { text-align: center; margin-top: 10px; }
+    .ritmo-status-emoji { font-size: 2rem; margin-bottom: 4px; }
+    .ritmo-status-text { font-size: 1.1rem; font-weight: 700; margin-bottom: 4px; }
+    .ritmo-status-desc { font-size: 0.82rem; color: var(--text-2); }
+    .ritmo-details { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
     .ritmo-detail-item {
-        background: rgba(255,255,255,0.05);
-        padding: 12px;
-        border-radius: 12px;
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        padding: 10px 12px;
+        border-radius: var(--radius-sm);
     }
-    .ritmo-detail-label {
-        font-size: 0.75rem;
-        opacity: 0.8;
-        margin-bottom: 5px;
-    }
-    .ritmo-detail-value {
-        font-size: 1.1rem;
-        font-weight: 700;
-    }
-    .gauge-container {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        margin: 20px 0;
-    }
-    .gauge {
-        position: relative;
-        width: 180px;
-        height: 180px;
-    }
-    .gauge-circle {
-        transform: rotate(-90deg);
-    }
-    .gauge-bg {
-        fill: none;
-        stroke: rgba(255,255,255,0.2);
-        stroke-width: 12;
-    }
-    .gauge-fill {
-        fill: none;
-        stroke-width: 12;
-        stroke-linecap: round;
-        transition: stroke-dashoffset 0.6s ease;
-    }
-    .gauge-fill.low { stroke: #4ade80; }
-    .gauge-fill.medium { stroke: #fbbf24; }
-    .gauge-fill.high { stroke: #ef4444; }
-    .gauge-text {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        text-align: center;
-    }
-    .gauge-percent {
-        font-size: 2.5rem;
-        font-weight: 700;
-        line-height: 1;
-    }
-    .gauge-label {
-        font-size: 0.85rem;
-        opacity: 0.8;
-        margin-top: 5px;
-    }
-    .gauge-info {
-        display: flex;
-        justify-content: space-around;
-        margin-top: 15px;
-        padding: 15px;
-        background: rgba(255,255,255,0.1);
-        border-radius: 12px;
-    }
-    .gauge-info-item {
-        text-align: center;
-    }
-    .gauge-info-label {
-        font-size: 0.75rem;
-        opacity: 0.8;
-        margin-bottom: 4px;
-    }
-    .gauge-info-value {
-        font-size: 1.1rem;
-        font-weight: 700;
-    }
-    .loading {
-        text-align: center;
-        padding: 40px;
-        font-size: 1.2rem;
-    }
-    .category-list {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
-        margin-top: 15px;
-    }
+    .ritmo-detail-label { font-size: 0.7rem; color: var(--text-2); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .ritmo-detail-value { font-size: 1rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+    /* ── GAUGE SVG ────────────────────────── */
+    .gauge-container { display: flex; justify-content: center; align-items: center; margin: 16px 0; }
+    .gauge { position: relative; width: 180px; height: 180px; }
+    .gauge-circle { transform: rotate(-90deg); }
+    .gauge-bg { fill: none; stroke: var(--surface-3); stroke-width: 10; }
+    .gauge-fill { fill: none; stroke-width: 10; stroke-linecap: round; transition: stroke-dashoffset 0.6s ease; }
+    .gauge-fill.low { stroke: var(--teal); }
+    .gauge-fill.medium { stroke: var(--amber); }
+    .gauge-fill.high { stroke: var(--red); }
+    .gauge-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
+    .gauge-percent { font-size: 2.2rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+    .gauge-label { font-size: 0.78rem; color: var(--text-2); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .gauge-info { display: flex; justify-content: space-around; margin-top: 12px; padding: 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+    .gauge-info-item { text-align: center; }
+    .gauge-info-label { font-size: 0.7rem; color: var(--text-2); margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .gauge-info-value { font-size: 1rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+    /* ── LOADING ──────────────────────────── */
+    .loading { text-align: center; padding: 60px; font-size: 1rem; color: var(--text-2); letter-spacing: 0.05em; }
+
+    /* ── CATEGORY LIST ────────────────────── */
+    .category-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
     .category-item {
-        background: rgba(255,255,255,0.1);
-        padding: 12px;
-        border-radius: 10px;
+        background: var(--surface-2);
+        padding: 10px;
+        border-radius: var(--radius-sm);
         text-align: center;
         cursor: pointer;
-        transition: 0.3s;
-        border: 2px solid transparent;
+        transition: all 0.2s;
+        border: 1px solid var(--border);
     }
-    .category-item.selected {
-        border-color: rgba(255,255,255,0.8);
-        background: rgba(255,255,255,0.25);
-    }
-    .category-item:active {
-        transform: scale(0.95);
-    }
-    .category-icon {
-        font-size: 2rem;
-        margin-bottom: 5px;
-    }
-    .category-name {
-        font-size: 0.85rem;
-        font-weight: 600;
-    }
-    .category-chart {
-        margin-top: 20px;
-    }
-    .category-bar {
-        margin-bottom: 15px;
-        cursor: pointer;
-        transition: 0.3s;
-        padding: 10px;
-        border-radius: 10px;
-    }
-    .category-bar:hover {
-        background: rgba(255,255,255,0.05);
-        transform: translateX(5px);
-    }
-    .category-bar:active {
-        transform: scale(0.98);
-    }
-    .category-bar-header {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 5px;
-        font-size: 0.9rem;
-    }
-    .category-bar-fill {
-        height: 8px;
-        background: rgba(255,255,255,0.3);
-        border-radius: 8px;
-        overflow: hidden;
-    }
-    .category-bar-progress {
-        height: 100%;
-        border-radius: 8px;
-        transition: width 0.5s;
-    }
-    .edit-btn {
-        background: rgba(59, 130, 246, 0.2);
-        border: none;
-        color: #fff;
-        padding: 8px 12px;
-        border-radius: 8px;
-        margin-left: 10px;
-        cursor: pointer;
-    }
+    .category-item.selected { border-color: var(--teal); background: var(--teal-dim); }
+    .category-item:active { transform: scale(0.96); }
+    .category-icon { font-size: 1.6rem; margin-bottom: 4px; }
+    .category-name { font-size: 0.78rem; font-weight: 600; color: var(--text-2); }
+    .category-item.selected .category-name { color: var(--teal); }
+
+    /* ── CATEGORY CHART ──────────────────── */
+    .category-chart { margin-top: 16px; }
+    .category-bar { margin-bottom: 12px; cursor: pointer; transition: 0.2s; padding: 8px; border-radius: var(--radius-sm); }
+    .category-bar:hover { background: var(--surface-2); transform: translateX(4px); }
+    .category-bar:active { transform: scale(0.99); }
+    .category-bar-header { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.88rem; }
+    .category-bar-fill { height: 6px; background: var(--surface-3); border-radius: 3px; overflow: hidden; }
+    .category-bar-progress { height: 100%; border-radius: 3px; transition: width 0.5s; }
+
+    /* ── MODAL ────────────────────────────── */
     .modal {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0,0,0,0.8);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 1000;
-        padding: 20px;
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.75);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 1000; padding: 20px;
+        backdrop-filter: blur(4px);
     }
     .modal-content {
-        background: var(--secondary);
-        border-radius: 20px;
-        padding: 30px;
-        max-width: 500px;
-        width: 100%;
-        max-height: 90vh;
-        overflow-y: auto;
+        background: var(--surface);
+        border: 1px solid var(--border-2);
+        border-radius: var(--radius-lg);
+        padding: 24px;
+        max-width: 500px; width: 100%;
+        max-height: 90vh; overflow-y: auto;
     }
-    .modal-header {
-        font-size: 1.5rem;
-        font-weight: 700;
-        margin-bottom: 20px;
-        text-align: center;
-    }
-    .modal-buttons {
-        display: flex;
-        gap: 10px;
-        margin-top: 20px;
-    }
-    .modal-buttons .btn {
-        flex: 1;
-    }
-    
-    /* Scrollbar personalizada para month-expenses */
-    .month-expenses.expanded::-webkit-scrollbar {
-        width: 6px;
-    }
-    .month-expenses.expanded::-webkit-scrollbar-track {
-        background: rgba(255,255,255,0.05);
-        border-radius: 10px;
-    }
-    .month-expenses.expanded::-webkit-scrollbar-thumb {
-        background: rgba(255,255,255,0.3);
-        border-radius: 10px;
-    }
-    .month-expenses.expanded::-webkit-scrollbar-thumb:hover {
-        background: rgba(255,255,255,0.5);
-    }
-    
-    @keyframes spin {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
-    }
-    
-    @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-    }
+    .modal-header { font-size: 1.2rem; font-weight: 700; margin-bottom: 18px; text-align: center; }
+    .modal-buttons { display: flex; gap: 10px; margin-top: 18px; }
+    .modal-buttons .btn { flex: 1; }
+
+    /* ── SCROLLBAR ────────────────────────── */
+    .month-expenses.expanded::-webkit-scrollbar { width: 4px; }
+    .month-expenses.expanded::-webkit-scrollbar-track { background: transparent; }
+    .month-expenses.expanded::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 4px; }
+    .month-expenses.expanded::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+
+    /* ── ANIMATIONS ───────────────────────── */
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 </style>
 
 <!-- jsPDF para geração de PDF -->
@@ -590,17 +521,16 @@
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <h1 style="margin: 0;">💰 Minhas Despesas</h1>
             <button onclick="refreshData()" id="mainRefreshBtn" style="
-                background: rgba(255,255,255,0.2);
-                border: none;
-                color: white;
-                width: 48px;
-                height: 48px;
-                border-radius: 50%;
-                font-size: 24px;
+                background: rgba(0,212,170,0.1);
+                border: 1px solid rgba(0,212,170,0.3);
+                color: #00D4AA;
+                width: 44px;
+                height: 44px;
+                border-radius: 8px;
+                font-size: 20px;
                 cursor: pointer;
-                transition: all 0.3s;
-                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            " onmouseover="this.style.background='rgba(255,255,255,0.3)'; this.style.transform='rotate(180deg)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'; this.style.transform='rotate(0deg)'">↻</button>
+                transition: all 0.2s;
+            " onmouseover="this.style.background='rgba(0,212,170,0.2)'; this.style.transform='rotate(180deg)'" onmouseout="this.style.background='rgba(0,212,170,0.1)'; this.style.transform='rotate(0deg)'">↻</button>
         </div>
 
     <div id="app"></div>
@@ -1478,7 +1408,7 @@
             });
         }
         
-        let html = '<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); ';
+        let html = '<div style="background: #00D4AA; ';
         html += 'border-radius: 20px; max-width: 500px; max-height: 80vh; overflow: hidden; ';
         html += 'box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">';
         
@@ -2859,7 +2789,7 @@
         
         modal.innerHTML = `
             <div style="
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                background: #00D4AA;
                 border-radius: 20px;
                 max-width: 500px;
                 width: 100%;
@@ -2896,7 +2826,7 @@
                 </div>
                 
                 <div style="
-                    background: rgba(255,255,255,0.15);
+                    background: rgba(0,0,0,0.8);
                     border-radius: 12px;
                     padding: 15px;
                     margin-bottom: 20px;
@@ -2952,7 +2882,7 @@
                                 background: rgba(255,255,255,0.1);
                                 border-radius: 12px;
                                 padding: 15px;
-                                border: 1px solid rgba(255,255,255,0.2);
+                                border: 1px solid rgba(255,255,255,0.07);
                             ">
                                 <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
                                     <div style="flex: 1; font-weight: 600; font-size: 0.95rem;">
@@ -3168,10 +3098,10 @@
                         onchange="state.selectedDashMonth = this.value; render();"
                         style="
                             padding: 10px 15px;
-                            background: rgba(255,255,255,0.95);
-                            border: 2px solid rgba(255,255,255,0.3);
+                            background: #162035;
+                            border: 1px solid rgba(0,212,170,0.3);
                             border-radius: 8px;
-                            color: #1f2937;
+                            color: #F0F4FF;
                             font-weight: 600;
                             cursor: pointer;
                             font-size: 0.95rem;
@@ -3183,7 +3113,7 @@
                             const [m, y] = monthYear.split('/');
                             const monthName = monthNames[parseInt(m) - 1];
                             const isSelected = monthYear === state.selectedDashMonth;
-                            return `<option value="${monthYear}" ${isSelected ? 'selected' : ''} style="background: white; color: #1f2937; padding: 8px;">
+                            return `<option value="${monthYear}" ${isSelected ? 'selected' : ''} style="background: #162035; color: #F0F4FF;">
                                 ${monthName} ${y}
                             </option>`;
                         }).join('')}
@@ -3658,10 +3588,10 @@
                                     style="
                                         width: 100%;
                                         padding: 12px;
-                                        background: rgba(255,255,255,0.1);
-                                        border: 2px solid rgba(255,255,255,0.2);
+                                        background: #162035;
+                                        border: 1px solid rgba(0,212,170,0.25);
                                         border-radius: 8px;
-                                        color: white;
+                                        color: #F0F4FF;
                                         font-size: 1rem;
                                         font-weight: 600;
                                         cursor: pointer;
@@ -3683,10 +3613,10 @@
                                 style="
                                     flex-shrink: 0;
                                     padding: 12px 24px;
-                                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                    background: #00D4AA;
                                     border: none;
                                     border-radius: 8px;
-                                    color: white;
+                                    color: #080D1A;
                                     font-size: 1rem;
                                     font-weight: 700;
                                     cursor: pointer;
@@ -3694,10 +3624,10 @@
                                     align-items: center;
                                     gap: 8px;
                                     transition: 0.3s;
-                                    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+                                    box-shadow: 0 4px 12px rgba(0,212,170,0.25);
                                     margin-top: 20px;
                                 "
-                                onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(102, 126, 234, 0.5)'"
+                                onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(0,212,170,0.35)'"
                                 onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(102, 126, 234, 0.4)'"
                             >
                                 📥 Gerar Relatório PDF
@@ -4026,7 +3956,7 @@
                             onclick="toggleManualEntry()"
                             style="
                                 background: rgba(255,255,255,0.1);
-                                border: 1px solid rgba(255,255,255,0.2);
+                                border: 1px solid rgba(255,255,255,0.07);
                                 color: white;
                                 padding: 6px 12px;
                                 border-radius: 8px;
@@ -4046,9 +3976,9 @@
                                 <button 
                                     onclick="pasteFromClipboard()"
                                     style="
-                                        background: rgba(255,255,255,0.08);
-                                        border: 1px solid rgba(255,255,255,0.15);
-                                        color: rgba(255,255,255,0.7);
+                                        background: rgba(255,255,255,0.05);
+                                        border: 1px solid rgba(255,255,255,0.1);
+                                        color: rgba(255,255,255,0.5);
                                         padding: 4px 10px;
                                         border-radius: 6px;
                                         cursor: pointer;
@@ -4058,8 +3988,8 @@
                                         align-items: center;
                                         gap: 4px;
                                     "
-                                    onmouseover="this.style.background='rgba(255,255,255,0.15)'; this.style.color='white';"
-                                    onmouseout="this.style.background='rgba(255,255,255,0.08)'; this.style.color='rgba(255,255,255,0.7)';"
+                                    onmouseover="this.style.background='rgba(0,212,170,0.15)'; this.style.color='#00D4AA';"
+                                    onmouseout="this.style.background='rgba(255,255,255,0.05)'; this.style.color='rgba(255,255,255,0.5)';"
                                 >
                                     📋 Colar
                                 </button>
@@ -4379,7 +4309,7 @@
                         <div style="flex: 1; min-width: 200px;">
                             <label style="display: block; font-size: 0.85rem; opacity: 0.8; margin-bottom: 5px;">📅 Selecione o Mês:</label>
                             <select 
-                                style="width: 100%; padding: 10px; background: rgba(255,255,255,0.95); border: none; border-radius: 8px; font-size: 1rem; color: #1f2937; font-weight: 600;"
+                                style="width: 100%; padding: 10px; background: #162035; border: 1px solid rgba(0,212,170,0.3); border-radius: 8px; font-size: 1rem; color: #F0F4FF; font-weight: 600;"
                                 onchange="state.selectedFixedMonth = this.value; loadMonthlyFixed(this.value);"
                             >
                                 ${monthsList.map(monthYear => {
@@ -4396,7 +4326,7 @@
                             <button 
                                 onclick="copyFromPrevMonth()"
                                 class="btn"
-                                style="background: #8b5cf6; padding: 10px 20px; white-space: nowrap;"
+                                style="background: rgba(139,92,246,0.8); padding: 10px 20px; white-space: nowrap;"
                             >
                                 📋 Copiar do Mês Anterior
                             </button>
@@ -4462,7 +4392,7 @@
                                 <button 
                                     onclick="copyFromPrevMonth()"
                                     class="btn"
-                                    style="margin-top: 15px; background: #8b5cf6;"
+                                    style="margin-top: 15px; background: rgba(139,92,246,0.8);"
                                 >
                                     📋 Copiar do Mês Anterior
                                 </button>
@@ -4690,8 +4620,8 @@
                                         style="
                                             flex-shrink: 0;
                                             padding: 10px 16px;
-                                            background: ${isSelected ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.1)'};
-                                            border: ${isSelected ? '2px solid rgba(255,255,255,0.5)' : '1px solid rgba(255,255,255,0.2)'};
+                                            background: ${isSelected ? 'rgba(0,212,170,0.15)' : 'var(--surface-2)'};
+                                            border: ${isSelected ? '1px solid rgba(0,212,170,0.5)' : '1px solid rgba(255,255,255,0.07)'};
                                             border-radius: 12px;
                                             color: white;
                                             cursor: pointer;
@@ -4859,7 +4789,7 @@
                                         </path>
                                     `}).join('')}
                                     <!-- Centro branco -->
-                                    <circle cx="100" cy="100" r="40" fill="rgba(255,255,255,0.15)" />
+                                    <circle cx="100" cy="100" r="40" fill="rgba(0,212,170,0.1)" />
                                     <text x="100" y="95" text-anchor="middle" fill="white" font-size="14" font-weight="700">Total</text>
                                     <text x="100" y="110" text-anchor="middle" fill="white" font-size="12">AED ${grandTotal.toFixed(0)}</text>
                                 </svg>
