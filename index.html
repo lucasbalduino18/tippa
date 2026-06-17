@@ -1098,26 +1098,23 @@
     }
 
     function parseSMS(text) {
-        // Helpers para data/hora atual
+        // Helpers para data/hora atual (usados quando o SMS não tem data)
         function todayDate() {
             const d = new Date();
-            const dd = String(d.getDate()).padStart(2, '0');
-            const mm = String(d.getMonth() + 1).padStart(2, '0');
-            const yyyy = d.getFullYear();
-            return `${dd}/${mm}/${yyyy}`;
+            return String(d.getDate()).padStart(2,'0') + '/' +
+                   String(d.getMonth()+1).padStart(2,'0') + '/' +
+                   d.getFullYear();
         }
         function nowTime() {
             const d = new Date();
-            const hh = String(d.getHours()).padStart(2, '0');
-            const mi = String(d.getMinutes()).padStart(2, '0');
-            const ss = String(d.getSeconds()).padStart(2, '0');
-            return `${hh}:${mi}:${ss}`;
+            return String(d.getHours()).padStart(2,'0') + ':' +
+                   String(d.getMinutes()).padStart(2,'0') + ':' +
+                   String(d.getSeconds()).padStart(2,'0');
         }
 
-        // Padrão 1: "Purchase of AED 355.00 with Credit Card ending 3783 at MIYABI SUSHI, DUBAI"
-        // Sem data — usa data/hora atual
-        const p1 = /Purchase of AED\s*([\d,\.]+).*?at\s+([^,]+)/i;
-        const m1 = text.match(p1);
+        // ── Padrão 1 (Lucas/Etihad): "Purchase of AED 355.00 with Credit Card ending 3783 at MIYABI SUSHI, DUBAI"
+        // Sem data no SMS — usa data/hora actual
+        const m1 = text.match(/Purchase\s+of\s+AED\s*([\d,\.]+).*?at\s+([^,]+)/i);
         if (m1) {
             return {
                 amount: parseFloat(m1[1].replace(/,/g, '')),
@@ -1128,9 +1125,9 @@
             };
         }
 
-        // Padrão 2: genérico AED com data e hora no SMS
-        const p2 = /(?:AED|aed)\s*([\d,\.]+).*?on\s+([\d\/]+)\s+([\d:]+).*?at\s+([^,]+)/i;
-        const m2 = text.match(p2);
+        // ── Padrão 2 (André/ADCB): "Your Cr.Card XXXXX was used for AED34.65 on 03/12/2025 16:20:26 at MERCHANT"
+        // Tem data e hora no SMS
+        const m2 = text.match(/(?:AED|aed)\s*([\d,\.]+).*?on\s+([\d\/]+)\s+([\d:]+).*?at\s+([^,]+)/i);
         if (m2) {
             return {
                 amount: parseFloat(m2[1].replace(/,/g, '')),
@@ -1141,9 +1138,8 @@
             };
         }
 
-        // Padrão 3: R$/USD/EUR com data e hora
-        const p3 = /(?:R\$|USD|EUR)\s*([\d,\.]+).*?(\d{2}\/\d{2}\/\d{4}).*?(\d{2}:\d{2}:\d{2}).*?(?:at|em)\s+([^,\.]+)/i;
-        const m3 = text.match(p3);
+        // ── Padrão 3: R$/USD/EUR com data e hora
+        const m3 = text.match(/(?:R\$|USD|EUR)\s*([\d,\.]+).*?(\d{2}\/\d{2}\/\d{4}).*?(\d{2}:\d{2}:\d{2}).*?(?:at|em)\s+([^,\.]+)/i);
         if (m3) {
             return {
                 amount: parseFloat(m3[1].replace(/,/g, '')),
@@ -1154,9 +1150,8 @@
             };
         }
 
-        // Padrão 4: formato valor/data/estabelecimento genérico
-        const p4 = /(?:valor|value|amount).*?([\d,\.]+).*?(?:data|date).*?(\d{2}\/\d{2}\/\d{4}).*?(\d{2}:\d{2}:\d{2}).*?(?:estabelecimento|merchant).*?([^\n]+)/i;
-        const m4 = text.match(p4);
+        // ── Padrão 4: formato valor/data/estabelecimento genérico
+        const m4 = text.match(/(?:valor|value|amount).*?([\d,\.]+).*?(?:data|date).*?(\d{2}\/\d{2}\/\d{4}).*?(\d{2}:\d{2}:\d{2}).*?(?:estabelecimento|merchant).*?([^\n]+)/i);
         if (m4) {
             return {
                 amount: parseFloat(m4[1].replace(/,/g, '')),
@@ -3999,7 +3994,9 @@
                             </div>
                             <textarea id="smsInput" placeholder="Cole aqui o SMS..." oninput="state.sms=this.value">${state.sms}</textarea>
                             <div style="font-size:0.8rem; opacity:0.7; margin-top:8px;">
-                                Exemplo: Your Cr.Card XXXXX was used for AED34.65 on 03/12/2025 16:20:26 at ALMAQAM AUTOMATIC BR...
+                            <div style="font-size:0.8rem; opacity:0.7; margin-top:8px;">
+                                Exemplo: Purchase of AED 716.55 with Credit Card ending xxxx at e& Digital App, Abu Dhabi. Avl Cr.......
+                            </div>
                             </div>
                         </div>
                     ` : `
