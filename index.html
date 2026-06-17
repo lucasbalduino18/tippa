@@ -1227,6 +1227,7 @@
         
         if (success) {
             // ✅ OTIMIZAÇÃO: Atualizar state localmente sem recarregar tudo do servidor
+            parsed.id = String(parsed.id); // Garantir mesmo tipo que vem do servidor
             state.expenses.push(parsed);
             updateCache();
 
@@ -1246,7 +1247,7 @@
             
             if (success) {
                 // ✅ OTIMIZAÇÃO: Remover localmente sem recarregar tudo
-                state.expenses = state.expenses.filter(e => e.id !== id);
+                state.expenses = state.expenses.filter(e => String(e.id) !== String(id));
                 updateCache();
                 render();
             } else {
@@ -1256,7 +1257,7 @@
     }
 
     function startEditExpense(id) {
-        const expense = state.expenses.find(e => e.id === id);
+        const expense = state.expenses.find(e => String(e.id) === String(id));
         if (expense) {
             state.editingExpense = { ...expense };
             render();
@@ -1275,7 +1276,7 @@
         
         if (success) {
             // ✅ OTIMIZAÇÃO: Atualizar localmente sem recarregar tudo
-            const idx = state.expenses.findIndex(e => e.id === state.editingExpense.id);
+            const idx = state.expenses.findIndex(e => String(e.id) === String(state.editingExpense.id));
             if (idx !== -1) state.expenses[idx] = { ...state.editingExpense };
             updateCache();
             state.editingExpense = null;
@@ -2097,6 +2098,7 @@
 
         if (success) {
             // ✅ OTIMIZAÇÃO: Atualizar state localmente sem recarregar tudo do servidor
+            expense.id = String(expense.id); // Garantir mesmo tipo que vem do servidor
             state.expenses.push(expense);
             updateCache();
             // Limpar campos
