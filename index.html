@@ -683,7 +683,8 @@
         viewingCategoryExpenses: null,  // Categoria sendo visualizada
         selectedCategoryMonth: null,  // Mês selecionado na aba categorias (formato MM/YYYY)
         selectedDashMonth: null,  // Mês selecionado no dashboard (formato MM/YYYY)
-        manualEntry: false  // Controla se está em modo manual ou SMS
+        manualEntry: false,  // Controla se está em modo manual ou SMS
+        saving: false  // Lock para evitar duplo envio
     };
 
     // Carregar dados do Google Sheets
@@ -1249,6 +1250,10 @@
     }
 
     async function addExpense() {
+        // Lock para evitar duplo envio
+        if (state.saving) return;
+        state.saving = true;
+
         // Capturar o SMS do campo antes de processar
         const smsInput = document.getElementById('smsInput');
         if (smsInput) {
@@ -1283,7 +1288,8 @@
 
         const success = await addExpenseToSheets(parsed);
 
-        // Sempre reabilitar o botão, independente do resultado
+        // Sempre reabilitar o botão e liberar o lock, independente do resultado
+        state.saving = false;
         if (btn) {
             btn.disabled = false;
             btn.textContent = 'Extrair e Adicionar';
@@ -2136,6 +2142,9 @@
         }
         
         const btn = event.target;
+        // Lock para evitar duplo envio
+        if (state.saving) return;
+        state.saving = true;
         btn.disabled = true;
         btn.textContent = 'Salvando...';
         
@@ -2150,9 +2159,16 @@
         };
         
         const success = await addExpenseToSheets(expense);
-        
+
+        // Sempre reabilitar o botão e liberar o lock, independente do resultado
+        state.saving = false;
+        btn.disabled = false;
+        btn.textContent = 'Adicionar Manualmente';
+
         if (success) {
-            await loadData(true); // ← FORÇAR REFRESH
+            // ✅ OTIMIZAÇÃO: Atualizar state localmente sem recarregar tudo do servidor
+            state.expenses.push(expense);
+            updateCache();
             // Limpar campos
             document.getElementById('manualMerchant').value = '';
             document.getElementById('manualAmount').value = '';
@@ -2160,12 +2176,10 @@
             document.getElementById('manualTime').value = '';
             state.obs = '';
             state.selectedCategory = null;
-            alert('✅ Despesa salva automaticamente no Google Sheets!');
             render();
+            showToast('✅ Despesa salva no Google Sheets!');
         } else {
-            alert('❌ Erro ao salvar. Tente novamente.');
-            btn.disabled = false;
-            btn.textContent = 'Adicionar Manualmente';
+            showToast('❌ Erro ao salvar. Tente novamente.', 'error');
         }
     }
 
