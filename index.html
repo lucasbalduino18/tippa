@@ -1275,10 +1275,10 @@
             if (idx !== -1) state.expenses[idx] = { ...state.editingExpense };
             updateCache();
             state.editingExpense = null;
-            alert('✅ Despesa atualizada com sucesso!');
             render();
+            showToast('✅ Despesa atualizada com sucesso!');
         } else {
-            alert('❌ Erro ao atualizar. Tente novamente.');
+            showToast('❌ Erro ao atualizar. Tente novamente.', 'error');
         }
     }
 
