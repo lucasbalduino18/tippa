@@ -1347,12 +1347,17 @@
         
         const value = parseFloat(input.value) || 0;
         if (value < 0) {
-            alert('⚠️ O rendimento não pode ser negativo');
+            showToast('⚠️ O rendimento não pode ser negativo', 'error');
             return;
         }
         
         const now = new Date();
         const monthKey = `${now.getMonth() + 1}/${now.getFullYear()}`;
+
+        // Feedback imediato no botão
+        const btn = input.nextElementSibling;
+        const originalText = btn ? btn.innerHTML : '';
+        if (btn) { btn.disabled = true; btn.innerHTML = '⏳'; }
         
         try {
             const url = `${SHEETS_URL}?action=saveIncome&month=${encodeURIComponent(monthKey)}&value=${value}`;
@@ -1360,15 +1365,27 @@
             const result = await response.json();
             
             if (result.success) {
+                // ✅ OTIMIZAÇÃO: Atualizar state localmente sem recarregar
                 state.monthlyIncome[monthKey] = value;
-                alert(`✅ Rendimento de AED ${value.toFixed(0)} salvo com sucesso!`);
+                updateCache();
+
+                // Feedback visual no input e botão
+                input.style.borderColor = '#00D4AA';
+                if (btn) { btn.innerHTML = '✓'; btn.style.background = '#00D4AA'; }
+                setTimeout(() => {
+                    input.style.borderColor = '';
+                    if (btn) { btn.innerHTML = originalText; btn.style.background = ''; btn.disabled = false; }
+                }, 1500);
+
+                showToast(`✅ Rendimento de AED ${value.toFixed(0)} salvo com sucesso!`);
                 render();
             } else {
                 throw new Error(result.error || 'Erro desconhecido');
             }
         } catch (error) {
             console.error('Erro ao salvar rendimento:', error);
-            alert('❌ Erro ao salvar rendimento. Tente novamente.');
+            if (btn) { btn.innerHTML = originalText; btn.disabled = false; }
+            showToast('❌ Erro ao salvar rendimento. Tente novamente.', 'error');
         }
     }
 
