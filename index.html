@@ -555,6 +555,7 @@
     // ⚠️ IMPORTANTE: COLE SUA URL DO GOOGLE SHEETS AQUI
     const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbwEswF9iD732EPa1dD6IEhjXR0CpbE2nWVrhVyr_oiyI6S0Fz9yTzvqA3l7-6Wg-Mn0/exec';
 
+
     // Categorias padrão
     const CATEGORIES = [
         { id: 'mercado', name: 'Mercado', icon: '🛒', color: '#10b981' },
@@ -570,23 +571,37 @@
     ];
 
     // Função para formatar valores em AED com centavos
-    function formatAED(value) {
-        return new Intl.NumberFormat('en-AE', {
-            style: 'currency',
-            currency: 'AED',
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        }).format(value);
+    // Locales recomendados por moeda
+    const CURRENCY_LOCALES = { AED: 'en-AE', BRL: 'pt-BR', USD: 'en-US', EUR: 'de-DE', GBP: 'en-GB', CHF: 'de-CH', CAD: 'en-CA', AUD: 'en-AU', JPY: 'ja-JP', CNY: 'zh-CN' };
+
+    function getCurrencyLocale() {
+        return CURRENCY_LOCALES[state.currency] || 'en-US';
     }
 
-    // Função para formatar valores em AED sem centavos
+    function formatAED(value) {
+        try {
+            return new Intl.NumberFormat(getCurrencyLocale(), {
+                style: 'currency',
+                currency: state.currency || 'AED',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }).format(value);
+        } catch(e) {
+            return (state.currency || 'AED') + ' ' + parseFloat(value).toFixed(2);
+        }
+    }
+
     function formatAEDShort(value) {
-        return new Intl.NumberFormat('en-AE', {
-            style: 'currency',
-            currency: 'AED',
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0
-        }).format(value);
+        try {
+            return new Intl.NumberFormat(getCurrencyLocale(), {
+                style: 'currency',
+                currency: state.currency || 'AED',
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            }).format(value);
+        } catch(e) {
+            return (state.currency || 'AED') + ' ' + parseFloat(value).toFixed(0);
+        }
     }
     
     // Normalizar mês para formato consistente (1/2026, não 01/2026)
@@ -629,7 +644,8 @@
         selectedCategoryMonth: null,  // Mês selecionado na aba categorias (formato MM/YYYY)
         selectedDashMonth: null,  // Mês selecionado no dashboard (formato MM/YYYY)
         manualEntry: false,  // Controla se está em modo manual ou SMS
-        saving: false  // Lock para evitar duplo envio
+        saving: false,  // Lock para evitar duplo envio
+        currency: 'AED'  // Moeda do sistema
     };
 
     // Carregar dados do Google Sheets
@@ -720,6 +736,7 @@
                 state.goal = cached.goal || 5000;
                 state.goalFixed = cached.goalFixed || 0;
                 state.yearlyGoal = cached.yearlyGoal || 0;
+                state.currency = cached.currency || 'AED';
                 state.fixedExpenses = cached.fixedExpenses || [];
                 
                 // Filtrar fixas mensais inválidas do cache
@@ -797,7 +814,8 @@
                 state.goal       = (m.meta       != null && m.meta       !== '') ? Number(m.meta)       : (state.goal       || 5000);
                 state.goalFixed  = (m.metaFixed  != null && m.metaFixed  !== '') ? Number(m.metaFixed)  : (state.goalFixed  || 0);
                 state.yearlyGoal = (m.yearlyGoal != null && m.yearlyGoal !== '') ? Number(m.yearlyGoal) : (state.yearlyGoal || 0);
-                console.log('✅ Meta:', state.goal, '| Fixas:', state.goalFixed, '| Anual:', state.yearlyGoal);
+                if (m.currency && m.currency.trim().length >= 2) state.currency = m.currency.trim().toUpperCase();
+                console.log('✅ Meta:', state.goal, '| Fixas:', state.goalFixed, '| Anual:', state.yearlyGoal, '| Moeda:', state.currency);
             } else {
                 console.error('❌ Meta falhou após retries — mantendo valores actuais');
             }
@@ -844,6 +862,7 @@
                 goal: state.goal,
                 goalFixed: state.goalFixed,
                 yearlyGoal: state.yearlyGoal,
+                currency: state.currency,
                 monthlyIncome: state.monthlyIncome
             });
             console.log('💾 Cache salvo');
@@ -915,7 +934,7 @@
     }
 
     async function updateGoalInSheets(valor) {
-        const url = `${SHEETS_URL}?action=setMeta&goal=${valor}&goalFixed=${state.goalFixed}&yearlyGoal=${state.yearlyGoal}`;
+        const url = `${SHEETS_URL}?action=setMeta&goal=${valor}&goalFixed=${state.goalFixed}&yearlyGoal=${state.yearlyGoal}&currency=${encodeURIComponent(state.currency || 'AED')}`;
         
         try {
             const response = await fetch(url);
@@ -929,7 +948,7 @@
     }
     
     async function updateGoalFixedInSheets(valor) {
-        const url = `${SHEETS_URL}?action=setMeta&goal=${state.goal}&goalFixed=${valor}&yearlyGoal=${state.yearlyGoal}`;
+        const url = `${SHEETS_URL}?action=setMeta&goal=${state.goal}&goalFixed=${valor}&yearlyGoal=${state.yearlyGoal}&currency=${encodeURIComponent(state.currency || 'AED')}`;
         
         try {
             const response = await fetch(url);
@@ -943,7 +962,7 @@
     }
     
     async function updateYearlyGoalInSheets(valor) {
-        const url = `${SHEETS_URL}?action=setMeta&goal=${state.goal}&goalFixed=${state.goalFixed}&yearlyGoal=${valor}`;
+        const url = `${SHEETS_URL}?action=setMeta&goal=${state.goal}&goalFixed=${state.goalFixed}&yearlyGoal=${valor}&currency=${encodeURIComponent(state.currency || 'AED')}`;
         
         try {
             const response = await fetch(url);
@@ -1095,6 +1114,7 @@
         const wb = XLSX.utils.book_new();
 
         // ── Aba 1: Despesas ──────────────────────────────────────────────
+        // Estrutura idêntica à planilha: ID, Valor, Data, Hora, Estabelecimento, Categoria, Observação
         const despesasRows = [['ID', 'Valor', 'Data', 'Hora', 'Estabelecimento', 'Categoria', 'Observação']];
         (state.expenses || []).forEach(e => {
             despesasRows.push([
@@ -1111,17 +1131,32 @@
         wsDespesas['!cols'] = [14,10,12,10,30,14,20].map(w => ({ wch: w }));
         XLSX.utils.book_append_sheet(wb, wsDespesas, 'Despesas');
 
-        // ── Aba 2: Despesas Fixas ────────────────────────────────────────
-        const fixasRows = [['Nome', 'Valor', 'Dia Vencimento', 'Categoria']];
-        (state.fixedExpenses || []).forEach(f => {
-            fixasRows.push([f.name || '', parseFloat(f.amount) || 0, f.day || '', f.category || '']);
-        });
-        const wsFixas = XLSX.utils.aoa_to_sheet(fixasRows);
-        wsFixas['!cols'] = [30,10,16,14].map(w => ({ wch: w }));
-        XLSX.utils.book_append_sheet(wb, wsFixas, 'Fixas');
+        // ── Aba 2: FixasPorMes ───────────────────────────────────────────
+        // Estrutura: Mês + todas as despesas fixas desse mês
+        const fixasPorMesRows = [['Mês', 'Nome', 'Valor', 'Categoria']];
+        Object.entries(state.monthlyFixedExpenses || {})
+            .sort(([a], [b]) => {
+                const [ma, ya] = a.split('/').map(Number);
+                const [mb, yb] = b.split('/').map(Number);
+                return ya !== yb ? yb - ya : mb - ma;
+            })
+            .forEach(([month, fixas]) => {
+                (fixas || []).forEach(f => {
+                    fixasPorMesRows.push([
+                        month,
+                        f.name || '',
+                        parseFloat(f.amount) || 0,
+                        f.category || ''
+                    ]);
+                });
+            });
+        const wsFixasPorMes = XLSX.utils.aoa_to_sheet(fixasPorMesRows);
+        wsFixasPorMes['!cols'] = [12,30,10,14].map(w => ({ wch: w }));
+        XLSX.utils.book_append_sheet(wb, wsFixasPorMes, 'FixasPorMes');
 
-        // ── Aba 3: Rendimentos Mensais ───────────────────────────────────
-        const rendRows = [['Mês', 'Rendimento (AED)']];
+        // ── Aba 3: Rendimentos ───────────────────────────────────────────
+        // Estrutura: Mês, Valor — ordenado mais recente primeiro
+        const rendRows = [['Mês', 'Valor']];
         Object.entries(state.monthlyIncome || {})
             .sort(([a], [b]) => {
                 const [ma, ya] = a.split('/').map(Number);
@@ -1132,23 +1167,61 @@
                 rendRows.push([month, parseFloat(value) || 0]);
             });
         const wsRend = XLSX.utils.aoa_to_sheet(rendRows);
-        wsRend['!cols'] = [12, 18].map(w => ({ wch: w }));
+        wsRend['!cols'] = [12, 14].map(w => ({ wch: w }));
         XLSX.utils.book_append_sheet(wb, wsRend, 'Rendimentos');
 
-        // ── Aba 4: Configurações ─────────────────────────────────────────
-        const configRows = [
-            ['Parâmetro', 'Valor'],
-            ['Limite Variáveis (AED)', state.goal || 0],
-            ['Limite Fixas (AED)', state.goalFixed || 0],
-            ['Meta Anual (AED)', state.yearlyGoal || 0],
+        // ── Aba 4: Fixas ─────────────────────────────────────────────────
+        // Estrutura idêntica à planilha: Nome, Valor, Dia, Categoria
+        const fixasRows = [['Nome', 'Valor', 'Dia', 'Categoria']];
+        (state.fixedExpenses || []).forEach(f => {
+            fixasRows.push([f.name || '', parseFloat(f.amount) || 0, f.day || '', f.category || '']);
+        });
+        const wsFixas = XLSX.utils.aoa_to_sheet(fixasRows);
+        wsFixas['!cols'] = [30,10,8,14].map(w => ({ wch: w }));
+        XLSX.utils.book_append_sheet(wb, wsFixas, 'Fixas');
+
+        // ── Aba 5: Meta ──────────────────────────────────────────────────
+        // Estrutura idêntica à planilha: linha 1 vazia, B2=Budget Variavel, B3=Budget Fixo, B4=Meta Economia, B5=Moeda
+        const metaRows = [
+            ['', ''],
+            ['Budget Variavel', state.goal || 0],
+            ['Budget Fixo',     state.goalFixed || 0],
+            ['Meta Economia',   state.yearlyGoal || 0],
+            ['Moeda',           state.currency || 'AED'],
         ];
-        const wsConfig = XLSX.utils.aoa_to_sheet(configRows);
-        wsConfig['!cols'] = [24, 16].map(w => ({ wch: w }));
-        XLSX.utils.book_append_sheet(wb, wsConfig, 'Configurações');
+        const wsMeta = XLSX.utils.aoa_to_sheet(metaRows);
+        wsMeta['!cols'] = [18, 14].map(w => ({ wch: w }));
+        XLSX.utils.book_append_sheet(wb, wsMeta, 'Meta');
 
         // Download
         XLSX.writeFile(wb, filename);
         showToast('✅ Backup baixado: ' + filename);
+    }
+
+    async function updateCurrency(value) {
+        const cur = value.trim().toUpperCase();
+        if (!cur || cur.length < 2 || cur.length > 4) {
+            showToast('❌ Moeda inválida. Use ex: AED, BRL, USD', 'error');
+            return false;
+        }
+        state.currency = cur;
+        updateCache();
+        render();
+
+        // Guardar na planilha via setMeta
+        try {
+            const url = `${SHEETS_URL}?action=setMeta&goal=${state.goal}&goalFixed=${state.goalFixed}&yearlyGoal=${state.yearlyGoal}&currency=${encodeURIComponent(cur)}`;
+            const response = await fetch(url);
+            const result = await response.json();
+            if (result.success) {
+                showToast(`✅ Moeda alterada para ${cur}`);
+            } else {
+                showToast(`✅ Moeda alterada para ${cur} (cache local)`);
+            }
+        } catch (e) {
+            showToast(`✅ Moeda alterada para ${cur} (cache local)`);
+        }
+        return true;
     }
 
     function openSettings() {
@@ -1197,7 +1270,7 @@
                             <div>
                                 <label style="display: block; font-size: 0.78rem; color: #94A3B8;
                                               margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">
-                                    💸 Despesas Variáveis (AED)
+                                    💸 Despesas Variáveis (<span class="settings-currency-label">${state.currency || 'AED'}</span>)
                                 </label>
                                 <div style="display: flex; gap: 8px;">
                                     <input type="number" id="settingsGoalInput" value="${state.goal}"
@@ -1228,7 +1301,7 @@
                             <div>
                                 <label style="display: block; font-size: 0.78rem; color: #94A3B8;
                                               margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">
-                                    💳 Despesas Fixas (AED)
+                                    💳 Despesas Fixas (<span class="settings-currency-label">${state.currency || 'AED'}</span>)
                                 </label>
                                 <div style="display: flex; gap: 8px;">
                                     <input type="number" id="settingsGoalFixedInput" value="${state.goalFixed}"
@@ -1255,7 +1328,7 @@
                             <div>
                                 <label style="display: block; font-size: 0.78rem; color: #94A3B8;
                                               margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">
-                                    🎯 Meta de Economia Anual (AED)
+                                    🎯 Meta de Economia Anual (<span class="settings-currency-label">${state.currency || 'AED'}</span>)
                                 </label>
                                 <div style="display: flex; gap: 8px;">
                                     <input type="number" id="settingsYearlyGoalInput" value="${state.yearlyGoal}"
@@ -1285,9 +1358,51 @@
                                         display: flex; justify-content: space-between; align-items: center;">
                                 <span style="font-size: 0.8rem; color: #94A3B8;">📊 Limite Total Mensal</span>
                                 <span style="font-size: 1.1rem; font-weight: 700; color: #00D4AA; font-variant-numeric: tabular-nums;">
-                                    AED ${formatAEDShort(state.goal + state.goalFixed)}
+                                    ${formatAEDShort(state.goal + state.goalFixed)}
                                 </span>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Separador -->
+                    <div style="border-top: 1px solid rgba(255,255,255,0.07);"></div>
+
+                    <!-- Secção Moeda -->
+                    <div>
+                        <div style="font-size: 0.72rem; color: #4E627A; text-transform: uppercase;
+                                    letter-spacing: 0.08em; margin-bottom: 12px;">Moeda</div>
+                        <label style="display: block; font-size: 0.78rem; color: #94A3B8;
+                                      margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">
+                            💱 Moeda do Sistema
+                        </label>
+                        <div style="display: flex; gap: 8px;">
+                            <select id="settingsCurrencySelect" style="
+                                flex: 1; padding: 11px 14px; background: #162035;
+                                border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
+                                color: #F0F4FF; font-size: 1rem; font-weight: 600; font-family: inherit;
+                                appearance: none; cursor: pointer;">
+                                ${['AED','BRL','USD','EUR','GBP','CHF','CAD','AUD','JPY','CNY'].map(c =>
+                                    `<option value="${c}" ${state.currency === c ? 'selected' : ''}
+                                     style="background: #162035;">${c}</option>`
+                                ).join('')}
+                            </select>
+                            <button onclick="
+                                const sel = document.getElementById('settingsCurrencySelect');
+                                const btn = this; const orig = btn.innerHTML;
+                                btn.disabled = true; btn.innerHTML = '⏳';
+                                updateCurrency(sel.value).then(ok => {
+                                    if (ok !== false) {
+                                        sel.style.borderColor = '#00D4AA';
+                                        btn.innerHTML = '✓'; btn.style.background = 'rgba(0,212,170,0.15)'; btn.style.color = '#00D4AA';
+                                        setTimeout(() => { sel.style.borderColor = ''; btn.innerHTML = orig; btn.style.background = ''; btn.style.color = '#94A3B8'; btn.disabled = false; }, 1500);
+                                    } else { btn.innerHTML = orig; btn.disabled = false; }
+                                });
+                            " style="padding: 11px 14px; background: transparent; border: 1px solid rgba(255,255,255,0.1);
+                                     border-radius: 8px; color: #94A3B8; font-size: 0.8rem; font-weight: 700;
+                                     cursor: pointer; white-space: nowrap; transition: all 0.2s; flex-shrink: 0;">💾</button>
+                        </div>
+                        <div style="font-size: 0.72rem; color: #4E627A; margin-top: 4px;">
+                            Afeta todos os valores exibidos no app
                         </div>
                     </div>
 
@@ -1316,6 +1431,13 @@
 
         modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
         document.body.appendChild(modal);
+
+        // Actualizar labels com a moeda actual após o modal ser inserido no DOM
+        requestAnimationFrame(() => {
+            modal.querySelectorAll('.settings-currency-label').forEach(el => {
+                el.textContent = state.currency || 'AED';
+            });
+        });
     }
 
     function showToast(msg, type = 'success') {
@@ -1611,7 +1733,7 @@
                     if (btn) { btn.innerHTML = originalText; btn.style.background = ''; btn.disabled = false; }
                 }, 1500);
 
-                showToast(`✅ Rendimento de AED ${value.toFixed(0)} salvo com sucesso!`);
+                showToast(`✅ Rendimento de ${state.currency || 'AED'} ${value.toFixed(0)} salvo com sucesso!`);
                 render();
             } else {
                 throw new Error(result.error || 'Erro desconhecido');
@@ -1698,7 +1820,7 @@
             if (month.isFuture) html += ' <span style="font-size: 0.7rem; color: #4E627A;">futuro</span>';
             html += '</div>';
             html += '<div style="font-size: 1rem; font-weight: 700; font-variant-numeric: tabular-nums; color: ' + (month.value > 0 ? '#22c55e' : '#4E627A') + ';">';
-            html += month.value > 0 ? 'AED ' + month.value.toFixed(0) : '—';
+            html += month.value > 0 ? (state.currency || 'AED') + ' ' + month.value.toFixed(0) : '—';
             html += '</div>';
             html += '</div>';
             
@@ -1781,7 +1903,7 @@
 
                 const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
                 const [m, y] = monthKey.split('/');
-                showToast(`✅ Rendimento de ${monthNames[parseInt(m)-1]} ${y} salvo: AED ${value.toFixed(0)}`);
+                showToast(`✅ Rendimento de ${monthNames[parseInt(m)-1]} ${y} salvo: ${state.currency || 'AED'} ${value.toFixed(0)}`);
             } else {
                 throw new Error(result.error || 'Erro desconhecido');
             }
@@ -2582,7 +2704,7 @@
         // Tabela de resumo
         doc.autoTable({
             startY: yPos,
-            head: [['Descricao', 'Valor (AED)']],
+            head: [['Descricao', `Valor (${state.currency || 'AED'})`]],
             body: [
                 ['Total de Rendimentos', `${totalIncome.toFixed(2)}`],
                 ['Total de Despesas Fixas', `${totalFixedExpenses.toFixed(2)}`],
@@ -3111,7 +3233,7 @@
                     margin-bottom: 20px;
                 ">
                     <div style="font-size: 0.85rem; opacity: 0.8; margin-bottom: 5px; text-align: center;">Total da Categoria</div>
-                    <div style="font-size: 1.8rem; font-weight: 700; text-align: center;">AED ${totalCategory.toFixed(2)}</div>
+                    <div style="font-size: 1.8rem; font-weight: 700; text-align: center;">${state.currency || 'AED'} ${totalCategory.toFixed(2)}</div>
                     <div style="font-size: 0.75rem; opacity: 0.7; margin-top: 5px; text-align: center;">
                         ${categoryExpenses.length} transações em ${sortedMerchants.length} estabelecimentos
                     </div>
@@ -3134,15 +3256,15 @@
                             return `
                                 <div style="text-align: center;">
                                     <div style="font-size: 0.68rem; color: #94A3B8; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.05em;">Média</div>
-                                    <div style="font-size: 0.9rem; font-weight: 700; font-variant-numeric: tabular-nums;">AED ${avgAmount.toFixed(2)}</div>
+                                    <div style="font-size: 0.9rem; font-weight: 700; font-variant-numeric: tabular-nums;">${state.currency || 'AED'} ${avgAmount.toFixed(2)}</div>
                                 </div>
                                 <div style="text-align: center;">
                                     <div style="font-size: 0.68rem; color: #94A3B8; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.05em;">Maior</div>
-                                    <div style="font-size: 0.9rem; font-weight: 700; font-variant-numeric: tabular-nums; color: #EF4444;">AED ${maxAmount.toFixed(2)}</div>
+                                    <div style="font-size: 0.9rem; font-weight: 700; font-variant-numeric: tabular-nums; color: #EF4444;">${state.currency || 'AED'} ${maxAmount.toFixed(2)}</div>
                                 </div>
                                 <div style="text-align: center;">
                                     <div style="font-size: 0.68rem; color: #94A3B8; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.05em;">Menor</div>
-                                    <div style="font-size: 0.9rem; font-weight: 700; font-variant-numeric: tabular-nums; color: #00D4AA;">AED ${minAmount.toFixed(2)}</div>
+                                    <div style="font-size: 0.9rem; font-weight: 700; font-variant-numeric: tabular-nums; color: #00D4AA;">${state.currency || 'AED'} ${minAmount.toFixed(2)}</div>
                                 </div>
                             `;
                         })()}
@@ -3169,7 +3291,7 @@
                                     </div>
                                     <div style="text-align: right;">
                                         <div style="font-size: 1rem; font-weight: 700; font-variant-numeric: tabular-nums; color: #F0F4FF;">
-                                            AED ${merchant.total.toFixed(2)}
+                                            ${state.currency || 'AED'} ${merchant.total.toFixed(2)}
                                         </div>
                                         <div style="font-size: 0.72rem; color: #94A3B8;">
                                             ${merchant.count} ${merchant.count === 1 ? 'vez' : 'vezes'}
@@ -3338,16 +3460,16 @@
                     <div class="ritmo-details">
                         <div class="ritmo-detail-item">
                             <div class="ritmo-detail-label">Gasto Real</div>
-                            <div class="ritmo-detail-value">AED ${ritmo.gastoReal.toFixed(0)}</div>
+                            <div class="ritmo-detail-value">${state.currency || 'AED'} ${ritmo.gastoReal.toFixed(0)}</div>
                         </div>
                         <div class="ritmo-detail-item">
                             <div class="ritmo-detail-label">Poderia Gastar</div>
-                            <div class="ritmo-detail-value">AED ${ritmo.poderiaGastar.toFixed(0)}</div>
+                            <div class="ritmo-detail-value">${state.currency || 'AED'} ${ritmo.poderiaGastar.toFixed(0)}</div>
                         </div>
                         <div class="ritmo-detail-item">
                             <div class="ritmo-detail-label">Diferença</div>
                             <div class="ritmo-detail-value" style="color: ${ritmo.diferenca > 0 ? '#ef4444' : '#22c55e'}">
-                                ${ritmo.diferenca > 0 ? '+' : ''}${ritmo.diferenca.toFixed(0)} AED
+                                ${ritmo.diferenca > 0 ? '+' : ''}${ritmo.diferenca.toFixed(0)} ${state.currency || 'AED'}
                             </div>
                         </div>
                         <div class="ritmo-detail-item">
@@ -3417,7 +3539,7 @@
                                 📅 ${monthDays.passed} ${monthDays.passed === 1 ? 'dia' : 'dias'} passado${monthDays.passed === 1 ? '' : 's'}
                             </div>
                             <div style="font-size: 0.7rem; opacity: 0.7; margin-top: 2px; color: #fbbf24;">
-                                ${monthDays.passed > 0 ? `💸 ${formatAEDShort(total / monthDays.passed)}/dia` : '💸 AED 0/dia'}
+                                ${monthDays.passed > 0 ? `💸 ${formatAEDShort(total / monthDays.passed)}/dia` : '💸 ' + (state.currency || 'AED') + ' 0/dia'}
                             </div>
                         </div>
                         <div class="meta-item">
@@ -3429,7 +3551,7 @@
                                 ${monthDays.isLastDay ? '📅 Último dia!' : `📅 ${monthDays.remaining} ${monthDays.remaining === 1 ? 'dia' : 'dias'} restante${monthDays.remaining === 1 ? '' : 's'}`}
                             </div>
                             <div style="font-size: 0.7rem; opacity: 0.7; margin-top: 2px; color: ${remaining < 0 ? '#fca5a5' : '#86efac'};">
-                                ${monthDays.isLastDay ? '💰 Tudo hoje' : (monthDays.remaining > 0 ? `💰 ${formatAEDShort(remaining / monthDays.remaining)}/dia` : '💰 AED 0/dia')}
+                                ${monthDays.isLastDay ? '💰 Tudo hoje' : (monthDays.remaining > 0 ? `💰 ${formatAEDShort(remaining / monthDays.remaining)}/dia` : '💰 ' + (state.currency || 'AED') + ' 0/dia')}
                             </div>
                         </div>
                     </div>
@@ -4287,7 +4409,7 @@
                         </div>
                         
                         <div class="input-group">
-                            <label class="label">Valor (AED):</label>
+                            <label class="label">${state.currency || 'AED'} — Valor:</label>
                             <input type="number" id="manualAmount" class="input-field" placeholder="Ex: 150.50" step="0.01" />
                         </div>
                         
@@ -4359,16 +4481,16 @@
                         let statusColor, statusIcon, statusText;
                         if (spentPercent < 100) { statusColor = '#22c55e'; statusIcon = '🎉'; statusText = 'Guardou ' + (100 - spentPercent).toFixed(1) + '% do rendimento'; }
                         else if (spentPercent === 100) { statusColor = '#f59e0b'; statusIcon = '⚠️'; statusText = 'Gastou exactamente 100% do rendimento'; }
-                        else { statusColor = '#ef4444'; statusIcon = '🚨'; statusText = 'Gastou AED ' + Math.abs(economy).toFixed(0) + ' a mais (' + spentPercent.toFixed(1) + '%)'; }
+                        else { statusColor = '#ef4444'; statusIcon = '🚨'; statusText = (state.currency || 'AED') + ' ' + Math.abs(economy).toFixed(0) + ' a mais (' + spentPercent.toFixed(1) + '%)'; }
                         html += '<div style="margin-top: 12px; padding: 12px; background: rgba(255,255,255,0.04); border-radius: 8px;">';
                         html += '<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; font-size: 0.82rem; margin-bottom: 10px;">';
-                        html += '<div><div style="color: #94A3B8; margin-bottom: 2px;">💰 Rendimento</div><div style="font-weight: 700; color: #22c55e; font-variant-numeric: tabular-nums;">AED ' + currentIncome.toFixed(0) + '</div></div>';
-                        html += '<div><div style="color: #94A3B8; margin-bottom: 2px;">💸 Variáveis</div><div style="font-weight: 700; color: #ef4444; font-variant-numeric: tabular-nums;">AED ' + total.toFixed(0) + '</div></div>';
-                        html += '<div><div style="color: #94A3B8; margin-bottom: 2px;">🔒 Fixas</div><div style="font-weight: 700; color: #f59e0b; font-variant-numeric: tabular-nums;">AED ' + fixedTotal.toFixed(0) + '</div></div>';
+                        html += '<div><div style="color: #94A3B8; margin-bottom: 2px;">💰 Rendimento</div><div style="font-weight: 700; color: #22c55e; font-variant-numeric: tabular-nums;">' + (state.currency || 'AED') + ' ' + currentIncome.toFixed(0) + '</div></div>';
+                        html += '<div><div style="color: #94A3B8; margin-bottom: 2px;">💸 Variáveis</div><div style="font-weight: 700; color: #ef4444; font-variant-numeric: tabular-nums;">' + (state.currency || 'AED') + ' ' + total.toFixed(0) + '</div></div>';
+                        html += '<div><div style="color: #94A3B8; margin-bottom: 2px;">🔒 Fixas</div><div style="font-weight: 700; color: #f59e0b; font-variant-numeric: tabular-nums;">' + (state.currency || 'AED') + ' ' + fixedTotal.toFixed(0) + '</div></div>';
                         html += '</div>';
                         html += '<div style="padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.07); display: flex; justify-content: space-between; align-items: center;">';
                         html += '<div style="font-size: 0.8rem; color: #94A3B8;">' + statusIcon + ' ' + statusText + '</div>';
-                        html += '<div style="font-size: 1.1rem; font-weight: 700; color: ' + statusColor + '; font-variant-numeric: tabular-nums;">' + (economy >= 0 ? '+' : '') + 'AED ' + economy.toFixed(0) + '</div>';
+                        html += '<div style="font-size: 1.1rem; font-weight: 700; color: ' + statusColor + '; font-variant-numeric: tabular-nums;">' + (economy >= 0 ? '+' : '') + (state.currency || 'AED') + ' ' + economy.toFixed(0) + '</div>';
                         html += '</div></div>';
                     }
 
@@ -4525,7 +4647,7 @@
                     
                     <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 15px;">
                         <div class="input-group">
-                            <label class="label">Valor (AED):</label>
+                            <label class="label">${state.currency || 'AED'} — Valor:</label>
                             <input type="number" id="fixedAmount" class="input-field" placeholder="Ex: 150.00" step="0.01" />
                         </div>
                         <div class="input-group">
@@ -4581,7 +4703,7 @@
                     ` : `
                         <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; margin-bottom: 15px;">
                             <div style="font-size: 0.85rem; opacity: 0.8; margin-bottom: 5px;">Total de Despesas Fixas</div>
-                            <div style="font-size: 2rem; font-weight: 700; color: #f59e0b;">AED ${totalFixed.toFixed(2)}</div>
+                            <div style="font-size: 2rem; font-weight: 700; color: #f59e0b;">${state.currency || 'AED'} ${totalFixed.toFixed(2)}</div>
                             <div style="font-size: 0.85rem; opacity: 0.7; margin-top: 5px;">${currentMonthFixed.length} despesa${currentMonthFixed.length !== 1 ? 's' : ''}</div>
                         </div>
                         
@@ -4608,7 +4730,7 @@
                                                 </div>
                                                 <div style="text-align: right;">
                                                     <div style="font-size: 1.3rem; font-weight: 700; color: ${cat ? cat.color : '#fff'};">
-                                                        AED ${parseFloat(fixed.amount).toFixed(2)}
+                                                        ${state.currency || 'AED'} ${parseFloat(fixed.amount).toFixed(2)}
                                                     </div>
                                                     <div style="font-size: 0.75rem; opacity: 0.7;">
                                                         ${cat ? cat.name : 'Outros'}
@@ -4784,13 +4906,13 @@
                                 
                                 if (monthTotal > state.goal) {
                                     statusIcon = '🔴';
-                                    statusTooltip = `Gastou acima do limite\\nExcedeu em AED ${Math.abs(remaining).toFixed(2)} (${percentOfGoal.toFixed(1)}%)`;
+                                    statusTooltip = `Gastou acima do limite\\nExcedeu em ${state.currency || 'AED'} ${Math.abs(remaining).toFixed(2)} (${percentOfGoal.toFixed(1)}%)`;
                                 } else if (monthTotal > state.goal * 0.9) {
                                     statusIcon = '🟡';
-                                    statusTooltip = `Gastou próximo do limite\\nFaltam AED ${remaining.toFixed(2)} (${percentOfGoal.toFixed(1)}%)`;
+                                    statusTooltip = `Gastou próximo do limite\\nFaltam ${state.currency || 'AED'} ${remaining.toFixed(2)} (${percentOfGoal.toFixed(1)}%)`;
                                 } else {
                                     statusIcon = '🟢';
-                                    statusTooltip = `Gastou abaixo do limite\\nDisponível AED ${remaining.toFixed(2)} (${percentOfGoal.toFixed(1)}%)`;
+                                    statusTooltip = `Gastou abaixo do limite\\nDisponível ${state.currency || 'AED'} ${remaining.toFixed(2)} (${percentOfGoal.toFixed(1)}%)`;
                                 }
                                 
                                 return `
@@ -4814,7 +4936,7 @@
                                     >
                                         <div>${statusIcon} ${monthNames[month - 1]} ${year}</div>
                                         <div style="font-size: 0.7rem; opacity: 0.8; margin-top: 3px;">
-                                            ${isCurrent ? 'Atual • ' : ''}AED ${monthTotal.toFixed(0)}
+                                            ${isCurrent ? 'Atual • ' : ''}${state.currency || 'AED'} ${monthTotal.toFixed(0)}
                                         </div>
                                     </button>
                                 `;
@@ -4843,7 +4965,7 @@
                                     <div class="category-bar" onclick="showCategoryMerchants('${categoryId}', '${selectedMonth}')">
                                         <div class="category-bar-header">
                                             <span>${stat.icon} ${stat.name}</span>
-                                            <span><strong>AED ${stat.total.toFixed(2)}</strong> (${stat.count})</span>
+                                            <span><strong>${state.currency || 'AED'} ${stat.total.toFixed(2)}</strong> (${stat.count})</span>
                                         </div>
                                         <div class="category-bar-fill">
                                             <div class="category-bar-progress" 
@@ -4965,13 +5087,13 @@
                                             onmouseout="this.style.opacity='1'"
                                             onclick="showCategoryMerchants('${categoryId}', '${selectedMonth}')"
                                         >
-                                            <title>${slice.icon} ${slice.name}: AED ${slice.total.toFixed(2)} (${slice.percentage.toFixed(1)}%)</title>
+                                            <title>${slice.icon} ${slice.name}: ${state.currency || 'AED'} ${slice.total.toFixed(2)} (${slice.percentage.toFixed(1)}%)</title>
                                         </path>
                                     `}).join('')}
                                     <!-- Centro branco -->
                                     <circle cx="100" cy="100" r="40" fill="rgba(0,212,170,0.1)" />
                                     <text x="100" y="95" text-anchor="middle" fill="white" font-size="14" font-weight="700">Total</text>
-                                    <text x="100" y="110" text-anchor="middle" fill="white" font-size="12">AED ${grandTotal.toFixed(0)}</text>
+                                    <text x="100" y="110" text-anchor="middle" fill="white" font-size="12">${state.currency || 'AED'} ${grandTotal.toFixed(0)}</text>
                                 </svg>
                                 
                                 <!-- Legenda -->
@@ -4997,7 +5119,7 @@
                                 <!-- Resumo -->
                                 <div style="width: 100%; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 12px; text-align: center;">
                                     <div style="font-size: 0.8rem; opacity: 0.8; margin-bottom: 5px;">Total Geral de Despesas Variáveis</div>
-                                    <div style="font-size: 1.5rem; font-weight: 700;">AED ${grandTotal.toFixed(2)}</div>
+                                    <div style="font-size: 1.5rem; font-weight: 700;">${state.currency || 'AED'} ${grandTotal.toFixed(2)}</div>
                                     <div style="font-size: 0.75rem; opacity: 0.7; margin-top: 5px;">${state.expenses.length} transações</div>
                                 </div>
                             </div>
@@ -5029,7 +5151,7 @@
                                 <div class="modal-header">
                                     ${cat ? cat.icon : '📦'} ${cat ? cat.name : 'Outros'}
                                     <div style="font-size: 0.9rem; font-weight: 400; margin-top: 5px; opacity: 0.9;">
-                                        ${monthNames[month - 1]} ${year} • Total: AED ${totalCategory.toFixed(2)} • ${categoryExpenses.length} despesas
+                                        ${monthNames[month - 1]} ${year} • Total: ${state.currency || 'AED'} ${totalCategory.toFixed(2)} • ${categoryExpenses.length} despesas
                                     </div>
                                 </div>
                                 
@@ -5051,7 +5173,7 @@
                                                         ${obs ? `<div class="expense-date" style="font-style: italic; margin-top: 4px;">💬 ${obs}</div>` : ''}
                                                     </div>
                                                     <div style="display:flex; align-items:center;">
-                                                        <div class="expense-amount">AED ${amount.toFixed(2)}</div>
+                                                        <div class="expense-amount">${state.currency || 'AED'} ${amount.toFixed(2)}</div>
                                                     </div>
                                                 </div>
                                             `;
@@ -5238,7 +5360,7 @@
                                                 display: flex;
                                                 align-items: center;
                                                 gap: 4px;
-                                            " title="${economyForBadge > 0 ? 'Guardou' : 'Déficit'} AED ${Math.abs(economyForBadge).toFixed(0)} (${Math.abs(economyPercent).toFixed(1)}% do rendimento)">
+                                            " title="${economyForBadge > 0 ? 'Guardou' : 'Déficit'} ${state.currency || 'AED'} ${Math.abs(economyForBadge).toFixed(0)} (${Math.abs(economyPercent).toFixed(1)}% do rendimento)">
                                                 ${badgeIcon}
                                                 ${economyForBadge > 0 ? '+' : ''}${(economyForBadge / 1000).toFixed(1)}K
                                             </span>
@@ -5247,7 +5369,7 @@
                                     <span style="display: flex; align-items: center; gap: 15px;">
                                         <span style="display: flex; align-items: center; gap: 8px;">
                                             <span title="${statusTitle}" style="font-size: 0.9rem;">${statusIcon}</span>
-                                            <span>AED ${totalMonth.toFixed(2)}</span>
+                                            <span>${state.currency || 'AED'} ${totalMonth.toFixed(2)}</span>
                                         </span>
                                         <span class="month-toggle ${isExpanded ? 'expanded' : ''}">▼</span>
                                     </span>
@@ -5292,30 +5414,30 @@
                                             
                                             // Rendimento
                                             html += '<div><div style="opacity: 0.8;">💰 Rendimento</div>';
-                                            html += '<div style="font-size: 1.1rem; font-weight: 700; color: #10b981;">AED ' + monthIncome.toFixed(0) + '</div></div>';
+                                            html += '<div style="font-size: 1.1rem; font-weight: 700; color: #10b981;">' + (state.currency || 'AED') + ' ' + monthIncome.toFixed(0) + '</div></div>';
                                             
                                             // Despesas Variáveis
                                             html += '<div><div style="opacity: 0.8;">💸 Variáveis</div>';
-                                            html += '<div style="font-size: 1.1rem; font-weight: 700; color: #ef4444;">AED ' + totalMonth.toFixed(0) + '</div></div>';
+                                            html += '<div style="font-size: 1.1rem; font-weight: 700; color: #ef4444;">' + (state.currency || 'AED') + ' ' + totalMonth.toFixed(0) + '</div></div>';
                                             
                                             // Despesas Fixas
                                             html += '<div><div style="opacity: 0.8;">🔒 Fixas</div>';
-                                            html += '<div style="font-size: 1.1rem; font-weight: 700; color: #f59e0b;">AED ' + fixedMonthTotal.toFixed(0) + '</div></div>';
+                                            html += '<div style="font-size: 1.1rem; font-weight: 700; color: #f59e0b;">' + (state.currency || 'AED') + ' ' + fixedMonthTotal.toFixed(0) + '</div></div>';
                                             
                                             // Total e Economia
                                             html += '<div style="grid-column: 1 / -1; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.2);">';
                                             html += '<div style="display: flex; justify-content: space-between; margin-bottom: 10px;">';
                                             html += '<div style="opacity: 0.8;">📊 Total Despesas</div>';
-                                            html += '<div style="font-weight: 700;">AED ' + totalMonthWithFixed.toFixed(0) + '</div>';
+                                            html += '<div style="font-weight: 700;">' + (state.currency || 'AED') + ' ' + totalMonthWithFixed.toFixed(0) + '</div>';
                                             html += '</div>';
                                             html += '<div style="opacity: 0.8;">' + (isPositive ? '🎉' : '⚠️') + ' Economia</div>';
                                             html += '<div style="font-size: 1.3rem; font-weight: 700; color: ' + (isPositive ? '#22c55e' : '#ef4444') + ';">';
-                                            html += (economy > 0 ? '+' : '') + 'AED ' + economy.toFixed(0) + '</div>';
+                                            html += (economy > 0 ? '+' : '') + (state.currency || 'AED') + ' ' + economy.toFixed(0) + '</div>';
                                             html += '<div style="font-size: 0.75rem; opacity: 0.7; margin-top: 5px;">';
                                             if (isPositive) {
                                                 html += 'Você guardou ' + economyPercent.toFixed(1) + '% do seu rendimento!';
                                             } else {
-                                                html += 'Gastou AED ' + Math.abs(economy).toFixed(0) + ' a mais que o rendimento';
+                                                html += (state.currency || 'AED') + ' ' + Math.abs(economy).toFixed(0) + ' a mais que o rendimento';
                                             }
                                             html += '</div></div></div></div>';
                                             
@@ -5343,7 +5465,7 @@
                                                 </span>
                                             </div>
                                             <div style="display:flex; align-items:center;">
-                                                <div class="expense-amount">AED ${amount.toFixed(2)}</div>
+                                                <div class="expense-amount">${state.currency || 'AED'} ${amount.toFixed(2)}</div>
                                                 <button class="edit-btn" onclick="startEditExpense('${e.id}')">✏️</button>
                                                 <button class="delete-btn" onclick="deleteExpense('${e.id}')">🗑️</button>
                                             </div>
@@ -5367,7 +5489,7 @@
                             </div>
                             
                             <div class="input-group">
-                                <label class="label">Valor (AED):</label>
+                                <label class="label">${state.currency || 'AED'} — Valor:</label>
                                 <input type="number" step="0.01" class="input-field" value="${state.editingExpense.amount}" 
                                        onchange="state.editingExpense.amount = parseFloat(this.value)">
                             </div>
