@@ -1199,11 +1199,29 @@
                                               margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">
                                     💸 Despesas Variáveis (AED)
                                 </label>
-                                <input type="number" id="settingsGoalInput" value="${state.goal}"
-                                       onblur="updateGoal(this.value)"
-                                       style="width: 100%; padding: 11px 14px; background: #162035;
-                                              border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
-                                              color: #F0F4FF; font-size: 1rem; font-weight: 600; font-family: inherit;">
+                                <div style="display: flex; gap: 8px;">
+                                    <input type="number" id="settingsGoalInput" value="${state.goal}"
+                                           style="flex: 1; padding: 11px 14px; background: #162035;
+                                                  border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
+                                                  color: #F0F4FF; font-size: 1rem; font-weight: 600; font-family: inherit; transition: border-color 0.2s;">
+                                    <button onclick="
+                                        const inp = document.getElementById('settingsGoalInput');
+                                        const btn = this; const orig = btn.innerHTML;
+                                        btn.disabled = true; btn.innerHTML = '⏳';
+                                        updateGoal(inp.value).then ? updateGoal(inp.value).then(() => {
+                                            inp.style.borderColor = '#00D4AA';
+                                            btn.innerHTML = '✓'; btn.style.background = 'rgba(0,212,170,0.15)'; btn.style.color = '#00D4AA';
+                                            setTimeout(() => { inp.style.borderColor = ''; btn.innerHTML = orig; btn.style.background = ''; btn.style.color = '#94A3B8'; btn.disabled = false; }, 1500);
+                                        }) : (async () => {
+                                            await updateGoal(inp.value);
+                                            inp.style.borderColor = '#00D4AA';
+                                            btn.innerHTML = '✓'; btn.style.background = 'rgba(0,212,170,0.15)'; btn.style.color = '#00D4AA';
+                                            setTimeout(() => { inp.style.borderColor = ''; btn.innerHTML = orig; btn.style.background = ''; btn.style.color = '#94A3B8'; btn.disabled = false; }, 1500);
+                                        })();
+                                    " style="padding: 11px 14px; background: transparent; border: 1px solid rgba(255,255,255,0.1);
+                                             border-radius: 8px; color: #94A3B8; font-size: 0.8rem; font-weight: 700;
+                                             cursor: pointer; white-space: nowrap; transition: all 0.2s; flex-shrink: 0;">💾</button>
+                                </div>
                                 <div style="font-size: 0.72rem; color: #4E627A; margin-top: 4px;">Mercado, restaurante, transporte, etc.</div>
                             </div>
 
@@ -1212,11 +1230,25 @@
                                               margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">
                                     💳 Despesas Fixas (AED)
                                 </label>
-                                <input type="number" id="settingsGoalFixedInput" value="${state.goalFixed}"
-                                       onblur="updateGoalFixed(this.value)"
-                                       style="width: 100%; padding: 11px 14px; background: #162035;
-                                              border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
-                                              color: #F0F4FF; font-size: 1rem; font-weight: 600; font-family: inherit;">
+                                <div style="display: flex; gap: 8px;">
+                                    <input type="number" id="settingsGoalFixedInput" value="${state.goalFixed}"
+                                           style="flex: 1; padding: 11px 14px; background: #162035;
+                                                  border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
+                                                  color: #F0F4FF; font-size: 1rem; font-weight: 600; font-family: inherit; transition: border-color 0.2s;">
+                                    <button onclick="
+                                        const inp = document.getElementById('settingsGoalFixedInput');
+                                        const btn = this; const orig = btn.innerHTML;
+                                        btn.disabled = true; btn.innerHTML = '⏳';
+                                        (async () => {
+                                            await updateGoalFixed(inp.value);
+                                            inp.style.borderColor = '#00D4AA';
+                                            btn.innerHTML = '✓'; btn.style.background = 'rgba(0,212,170,0.15)'; btn.style.color = '#00D4AA';
+                                            setTimeout(() => { inp.style.borderColor = ''; btn.innerHTML = orig; btn.style.background = ''; btn.style.color = '#94A3B8'; btn.disabled = false; }, 1500);
+                                        })();
+                                    " style="padding: 11px 14px; background: transparent; border: 1px solid rgba(255,255,255,0.1);
+                                             border-radius: 8px; color: #94A3B8; font-size: 0.8rem; font-weight: 700;
+                                             cursor: pointer; white-space: nowrap; transition: all 0.2s; flex-shrink: 0;">💾</button>
+                                </div>
                                 <div style="font-size: 0.72rem; color: #4E627A; margin-top: 4px;">Aluguel, contas, assinaturas, etc.</div>
                             </div>
 
@@ -1225,11 +1257,25 @@
                                               margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">
                                     🎯 Meta de Economia Anual (AED)
                                 </label>
-                                <input type="number" id="settingsYearlyGoalInput" value="${state.yearlyGoal}"
-                                       onblur="updateYearlyGoal(this.value)"
-                                       style="width: 100%; padding: 11px 14px; background: #162035;
-                                              border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
-                                              color: #F0F4FF; font-size: 1rem; font-weight: 600; font-family: inherit;">
+                                <div style="display: flex; gap: 8px;">
+                                    <input type="number" id="settingsYearlyGoalInput" value="${state.yearlyGoal}"
+                                           style="flex: 1; padding: 11px 14px; background: #162035;
+                                                  border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
+                                                  color: #F0F4FF; font-size: 1rem; font-weight: 600; font-family: inherit; transition: border-color 0.2s;">
+                                    <button onclick="
+                                        const inp = document.getElementById('settingsYearlyGoalInput');
+                                        const btn = this; const orig = btn.innerHTML;
+                                        btn.disabled = true; btn.innerHTML = '⏳';
+                                        (async () => {
+                                            await updateYearlyGoal(inp.value);
+                                            inp.style.borderColor = '#00D4AA';
+                                            btn.innerHTML = '✓'; btn.style.background = 'rgba(0,212,170,0.15)'; btn.style.color = '#00D4AA';
+                                            setTimeout(() => { inp.style.borderColor = ''; btn.innerHTML = orig; btn.style.background = ''; btn.style.color = '#94A3B8'; btn.disabled = false; }, 1500);
+                                        })();
+                                    " style="padding: 11px 14px; background: transparent; border: 1px solid rgba(255,255,255,0.1);
+                                             border-radius: 8px; color: #94A3B8; font-size: 0.8rem; font-weight: 700;
+                                             cursor: pointer; white-space: nowrap; transition: all 0.2s; flex-shrink: 0;">💾</button>
+                                </div>
                                 <div style="font-size: 0.72rem; color: #4E627A; margin-top: 4px;">Quanto deseja economizar este ano?</div>
                             </div>
 
