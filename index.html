@@ -520,17 +520,32 @@
     <div class="container">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <h1 style="margin: 0;">💰 Minhas Despesas</h1>
-            <button onclick="refreshData()" id="mainRefreshBtn" style="
-                background: rgba(0,212,170,0.1);
-                border: 1px solid rgba(0,212,170,0.3);
-                color: #00D4AA;
-                width: 44px;
-                height: 44px;
-                border-radius: 8px;
-                font-size: 20px;
-                cursor: pointer;
-                transition: all 0.2s;
-            " onmouseover="this.style.background='rgba(0,212,170,0.2)'; this.style.transform='rotate(180deg)'" onmouseout="this.style.background='rgba(0,212,170,0.1)'; this.style.transform='rotate(0deg)'">↻</button>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <button onclick="openSettings()" title="Configurações" style="
+                    background: rgba(255,255,255,0.04);
+                    border: 1px solid rgba(255,255,255,0.1);
+                    color: #94A3B8;
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 8px;
+                    font-size: 16px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    display: flex; align-items: center; justify-content: center;
+                " onmouseover="this.style.background='rgba(255,255,255,0.08)'; this.style.color='#F0F4FF';"
+                   onmouseout="this.style.background='rgba(255,255,255,0.04)'; this.style.color='#94A3B8';">⚙️</button>
+                <button onclick="refreshData()" id="mainRefreshBtn" style="
+                    background: rgba(0,212,170,0.1);
+                    border: 1px solid rgba(0,212,170,0.3);
+                    color: #00D4AA;
+                    width: 44px;
+                    height: 44px;
+                    border-radius: 8px;
+                    font-size: 20px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                " onmouseover="this.style.background='rgba(0,212,170,0.2)'; this.style.transform='rotate(180deg)'" onmouseout="this.style.background='rgba(0,212,170,0.1)'; this.style.transform='rotate(0deg)'">↻</button>
+            </div>
         </div>
 
     <div id="app"></div>
@@ -704,6 +719,7 @@
                 state.expenses = cached.expenses || [];
                 state.goal = cached.goal || 5000;
                 state.goalFixed = cached.goalFixed || 0;
+                state.yearlyGoal = cached.yearlyGoal || 0;
                 state.fixedExpenses = cached.fixedExpenses || [];
                 
                 // Filtrar fixas mensais inválidas do cache
@@ -737,97 +753,87 @@
             }
         }
         
+        // Função auxiliar: fetch com retry automático
+        async function fetchWithRetry(url, retries = 3, delayMs = 1000) {
+            for (let attempt = 1; attempt <= retries; attempt++) {
+                try {
+                    const response = await fetch(url);
+                    const data = await response.json();
+                    return { ok: true, data };
+                } catch (err) {
+                    console.warn(`⚠️ Tentativa ${attempt}/${retries} falhou para ${url.split('action=')[1]}: ${err.message}`);
+                    if (attempt < retries) await new Promise(r => setTimeout(r, delayMs * attempt));
+                }
+            }
+            return { ok: false, data: null };
+        }
+
         try {
             console.log('=== INICIANDO CARREGAMENTO ===');
-            console.log('URL:', SHEETS_URL);
-            console.log('Force Refresh:', forceRefresh);
-            
-            // REQUESTS PARALELOS - Todas ao mesmo tempo
-            const [despesasResult, metaResult, fixedResult, incomeResult, monthlyFixedResult] = await Promise.allSettled([
-                fetch(`${SHEETS_URL}?action=getDespesas`).then(r => r.json()),
-                fetch(`${SHEETS_URL}?action=getMeta`).then(r => r.json()),
-                fetch(`${SHEETS_URL}?action=getFixedExpenses`).then(r => r.json()),
-                fetch(`${SHEETS_URL}?action=getIncome`).then(r => r.json()),
-                fetch(`${SHEETS_URL}?action=getAllMonthlyFixed`).then(r => r.json())
-            ]);
-            
-            // Processar despesas
-            if (despesasResult.status === 'fulfilled') {
-                const despesasData = despesasResult.value;
-                state.expenses = despesasData.expenses || despesasData || [];
+
+            // ── Fase 1: Despesas (maior payload — primeiro) ──────────────
+            const despesasRes = await fetchWithRetry(`${SHEETS_URL}?action=getDespesas`);
+            if (despesasRes.ok) {
+                const d = despesasRes.data;
+                state.expenses = d.expenses || d || [];
                 console.log('✅ Despesas:', state.expenses.length);
             } else {
-                console.error('❌ Erro despesas:', despesasResult.reason);
-                state.expenses = [];
+                console.error('❌ Despesas falharam após retries');
+                state.expenses = state.expenses || [];
             }
-            
+
+            // ── Fase 2: Meta + Fixas + Rendimentos em paralelo ──────────
+            // Agora com menos pressão no servidor (despesas já terminaram)
+            const [metaRes, fixedRes, incomeRes, monthlyFixedRes] = await Promise.all([
+                fetchWithRetry(`${SHEETS_URL}?action=getMeta`),
+                fetchWithRetry(`${SHEETS_URL}?action=getFixedExpenses`),
+                fetchWithRetry(`${SHEETS_URL}?action=getIncome`),
+                fetchWithRetry(`${SHEETS_URL}?action=getAllMonthlyFixed`)
+            ]);
+
             // Processar meta
-            if (metaResult.status === 'fulfilled') {
-                const metaData = metaResult.value;
-                console.log('📥 Dados recebidos do getMeta:', JSON.stringify(metaData));
-                console.log('📥 metaData.meta:', metaData.meta);
-                console.log('📥 metaData.metaFixed:', metaData.metaFixed);
-                console.log('📥 metaData.yearlyGoal:', metaData.yearlyGoal);
-                
-                state.goal = metaData.meta || 5000;
-                state.goalFixed = metaData.metaFixed || 0;
-                state.yearlyGoal = metaData.yearlyGoal || 0;
-                console.log('✅ Limite Variáveis carregado:', state.goal);
-                console.log('✅ Limite Fixas carregado:', state.goalFixed);
-                console.log('✅ Meta Anual carregada:', state.yearlyGoal);
+            if (metaRes.ok) {
+                const m = metaRes.data;
+                state.goal       = (m.meta       != null && m.meta       !== '') ? Number(m.meta)       : (state.goal       || 5000);
+                state.goalFixed  = (m.metaFixed  != null && m.metaFixed  !== '') ? Number(m.metaFixed)  : (state.goalFixed  || 0);
+                state.yearlyGoal = (m.yearlyGoal != null && m.yearlyGoal !== '') ? Number(m.yearlyGoal) : (state.yearlyGoal || 0);
+                console.log('✅ Meta:', state.goal, '| Fixas:', state.goalFixed, '| Anual:', state.yearlyGoal);
             } else {
-                console.error('❌ Erro meta:', metaResult.reason);
-                state.goal = 5000;
-                state.goalFixed = 0;
-                state.yearlyGoal = 0;
+                console.error('❌ Meta falhou após retries — mantendo valores actuais');
             }
-            
+
             // Processar fixas
-            if (fixedResult.status === 'fulfilled') {
-                const fixedData = fixedResult.value;
-                state.fixedExpenses = fixedData.fixedExpenses || [];
+            if (fixedRes.ok) {
+                state.fixedExpenses = fixedRes.data.fixedExpenses || [];
                 console.log('✅ Fixas:', state.fixedExpenses.length);
             } else {
-                console.log('⚠️ Fixas não disponíveis');
-                state.fixedExpenses = [];
+                console.error('❌ Fixas falharam após retries — mantendo valores actuais');
+                state.fixedExpenses = state.fixedExpenses || [];
             }
-            
+
             // Processar rendimentos
-            if (incomeResult.status === 'fulfilled') {
-                const incomeData = incomeResult.value;
-                state.monthlyIncome = incomeData.income || {};
+            if (incomeRes.ok) {
+                state.monthlyIncome = incomeRes.data.income || {};
                 console.log('✅ Rendimentos:', Object.keys(state.monthlyIncome).length, 'meses');
             } else {
-                console.log('⚠️ Rendimentos não disponíveis');
-                state.monthlyIncome = {};
+                console.error('❌ Rendimentos falharam após retries — mantendo valores actuais');
+                state.monthlyIncome = state.monthlyIncome || {};
             }
-            
-            // Processar fixas mensais (NOVO)
-            if (monthlyFixedResult.status === 'fulfilled') {
-                const monthlyFixedData = monthlyFixedResult.value;
-                if (monthlyFixedData.success) {
-                    // Filtrar meses inválidos
-                    const cleanedFixed = {};
-                    Object.keys(monthlyFixedData.monthlyFixed || {}).forEach(month => {
-                        if (month && 
-                            !month.includes('undefined') && 
-                            !month.includes('NaN') && 
-                            month !== '0/0' &&
-                            month.includes('/')) {
-                            cleanedFixed[month] = monthlyFixedData.monthlyFixed[month];
-                        } else {
-                            console.warn('⚠️ Mês inválido ignorado:', month);
-                        }
-                    });
-                    
-                    state.monthlyFixedExpenses = cleanedFixed;
-                    console.log('✅ Fixas Mensais:', Object.keys(state.monthlyFixedExpenses).length, 'meses válidos');
-                } else {
-                    state.monthlyFixedExpenses = {};
-                }
+
+            // Processar fixas mensais
+            if (monthlyFixedRes.ok && monthlyFixedRes.data.success) {
+                const cleanedFixed = {};
+                Object.keys(monthlyFixedRes.data.monthlyFixed || {}).forEach(month => {
+                    if (month && !month.includes('undefined') && !month.includes('NaN') &&
+                        month !== '0/0' && month.includes('/')) {
+                        cleanedFixed[month] = monthlyFixedRes.data.monthlyFixed[month];
+                    }
+                });
+                state.monthlyFixedExpenses = cleanedFixed;
+                console.log('✅ Fixas Mensais:', Object.keys(state.monthlyFixedExpenses).length, 'meses');
             } else {
-                console.log('⚠️ Fixas mensais não disponíveis');
-                state.monthlyFixedExpenses = {};
+                console.error('❌ Fixas mensais falharam após retries — mantendo valores actuais');
+                state.monthlyFixedExpenses = state.monthlyFixedExpenses || {};
             }
 
             // Salvar cache
@@ -837,26 +843,18 @@
                 monthlyFixedExpenses: state.monthlyFixedExpenses,
                 goal: state.goal,
                 goalFixed: state.goalFixed,
+                yearlyGoal: state.yearlyGoal,
                 monthlyIncome: state.monthlyIncome
             });
             console.log('💾 Cache salvo');
 
             state.loading = false;
-            
-            // Só renderiza se for a primeira carga
-            if (wasLoading) {
-                render();
-            }
+            if (wasLoading) render();
+
         } catch (error) {
             console.error('Erro ao carregar dados:', error);
-            console.error('URL sendo usada:', SHEETS_URL);
-            if (wasLoading) {
-                alert(`❌ Erro ao carregar dados.\n\nDetalhes: ${error.message}\n\nVerifique:\n1. Apps Script foi reimplantado?\n2. URL está correta?\n3. Planilha tem aba "Despesas"?`);
-            }
             state.loading = false;
-            if (wasLoading) {
-                render();
-            }
+            if (wasLoading) render();
         }
     }
 
@@ -1073,6 +1071,205 @@
             console.error('Erro ao obter todas as fixas mensais:', error);
             return {};
         }
+    }
+
+    async function downloadBackup() {
+        showToast('⏳ Preparando backup...', 'success');
+
+        const now = new Date();
+        const dd = String(now.getDate()).padStart(2,'0');
+        const mm = String(now.getMonth()+1).padStart(2,'0');
+        const yyyy = now.getFullYear();
+        const filename = `despesas_backup_${dd}-${mm}-${yyyy}.xlsx`;
+
+        // Carregar SheetJS dinamicamente
+        await new Promise((resolve, reject) => {
+            if (window.XLSX) { resolve(); return; }
+            const s = document.createElement('script');
+            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+            s.onload = resolve;
+            s.onerror = reject;
+            document.head.appendChild(s);
+        });
+
+        const wb = XLSX.utils.book_new();
+
+        // ── Aba 1: Despesas ──────────────────────────────────────────────
+        const despesasRows = [['ID', 'Valor', 'Data', 'Hora', 'Estabelecimento', 'Categoria', 'Observação']];
+        (state.expenses || []).forEach(e => {
+            despesasRows.push([
+                e.id || '',
+                parseFloat(e.amount) || 0,
+                e.date || '',
+                e.time || '',
+                e.merchant || '',
+                e.category || '',
+                e.obs || ''
+            ]);
+        });
+        const wsDespesas = XLSX.utils.aoa_to_sheet(despesasRows);
+        wsDespesas['!cols'] = [14,10,12,10,30,14,20].map(w => ({ wch: w }));
+        XLSX.utils.book_append_sheet(wb, wsDespesas, 'Despesas');
+
+        // ── Aba 2: Despesas Fixas ────────────────────────────────────────
+        const fixasRows = [['Nome', 'Valor', 'Dia Vencimento', 'Categoria']];
+        (state.fixedExpenses || []).forEach(f => {
+            fixasRows.push([f.name || '', parseFloat(f.amount) || 0, f.day || '', f.category || '']);
+        });
+        const wsFixas = XLSX.utils.aoa_to_sheet(fixasRows);
+        wsFixas['!cols'] = [30,10,16,14].map(w => ({ wch: w }));
+        XLSX.utils.book_append_sheet(wb, wsFixas, 'Fixas');
+
+        // ── Aba 3: Rendimentos Mensais ───────────────────────────────────
+        const rendRows = [['Mês', 'Rendimento (AED)']];
+        Object.entries(state.monthlyIncome || {})
+            .sort(([a], [b]) => {
+                const [ma, ya] = a.split('/').map(Number);
+                const [mb, yb] = b.split('/').map(Number);
+                return ya !== yb ? yb - ya : mb - ma;
+            })
+            .forEach(([month, value]) => {
+                rendRows.push([month, parseFloat(value) || 0]);
+            });
+        const wsRend = XLSX.utils.aoa_to_sheet(rendRows);
+        wsRend['!cols'] = [12, 18].map(w => ({ wch: w }));
+        XLSX.utils.book_append_sheet(wb, wsRend, 'Rendimentos');
+
+        // ── Aba 4: Configurações ─────────────────────────────────────────
+        const configRows = [
+            ['Parâmetro', 'Valor'],
+            ['Limite Variáveis (AED)', state.goal || 0],
+            ['Limite Fixas (AED)', state.goalFixed || 0],
+            ['Meta Anual (AED)', state.yearlyGoal || 0],
+        ];
+        const wsConfig = XLSX.utils.aoa_to_sheet(configRows);
+        wsConfig['!cols'] = [24, 16].map(w => ({ wch: w }));
+        XLSX.utils.book_append_sheet(wb, wsConfig, 'Configurações');
+
+        // Download
+        XLSX.writeFile(wb, filename);
+        showToast('✅ Backup baixado: ' + filename);
+    }
+
+    function openSettings() {
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.style.cssText = `
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1000; padding: 20px;
+            animation: fadeIn 0.2s;
+            backdrop-filter: blur(4px);
+        `;
+
+        const now = new Date();
+        modal.innerHTML = `
+            <div style="
+                background: #0F1729;
+                border: 1px solid rgba(255,255,255,0.08);
+                border-radius: 16px;
+                max-width: 500px; width: 100%;
+                max-height: 90vh; overflow-y: auto;
+                box-shadow: 0 24px 60px rgba(0,0,0,0.6);
+            ">
+                <!-- Header -->
+                <div style="padding: 18px 20px; border-bottom: 1px solid rgba(255,255,255,0.07);
+                            display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h3 style="margin: 0; color: #F0F4FF; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.05em;">⚙️ Configurações</h3>
+                    </div>
+                    <button onclick="this.closest('.modal-overlay').remove()" style="
+                        background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+                        color: #94A3B8; width: 32px; height: 32px; border-radius: 8px;
+                        font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center;">×</button>
+                </div>
+
+                <!-- Body -->
+                <div style="padding: 20px; display: flex; flex-direction: column; gap: 20px;">
+
+                    <!-- Secção Limites -->
+                    <div>
+                        <div style="font-size: 0.72rem; color: #4E627A; text-transform: uppercase;
+                                    letter-spacing: 0.08em; margin-bottom: 12px;">Limites Mensais</div>
+
+                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                            <div>
+                                <label style="display: block; font-size: 0.78rem; color: #94A3B8;
+                                              margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">
+                                    💸 Despesas Variáveis (AED)
+                                </label>
+                                <input type="number" id="settingsGoalInput" value="${state.goal}"
+                                       onblur="updateGoal(this.value)"
+                                       style="width: 100%; padding: 11px 14px; background: #162035;
+                                              border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
+                                              color: #F0F4FF; font-size: 1rem; font-weight: 600; font-family: inherit;">
+                                <div style="font-size: 0.72rem; color: #4E627A; margin-top: 4px;">Mercado, restaurante, transporte, etc.</div>
+                            </div>
+
+                            <div>
+                                <label style="display: block; font-size: 0.78rem; color: #94A3B8;
+                                              margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">
+                                    💳 Despesas Fixas (AED)
+                                </label>
+                                <input type="number" id="settingsGoalFixedInput" value="${state.goalFixed}"
+                                       onblur="updateGoalFixed(this.value)"
+                                       style="width: 100%; padding: 11px 14px; background: #162035;
+                                              border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
+                                              color: #F0F4FF; font-size: 1rem; font-weight: 600; font-family: inherit;">
+                                <div style="font-size: 0.72rem; color: #4E627A; margin-top: 4px;">Aluguel, contas, assinaturas, etc.</div>
+                            </div>
+
+                            <div>
+                                <label style="display: block; font-size: 0.78rem; color: #94A3B8;
+                                              margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">
+                                    🎯 Meta de Economia Anual (AED)
+                                </label>
+                                <input type="number" id="settingsYearlyGoalInput" value="${state.yearlyGoal}"
+                                       onblur="updateYearlyGoal(this.value)"
+                                       style="width: 100%; padding: 11px 14px; background: #162035;
+                                              border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
+                                              color: #F0F4FF; font-size: 1rem; font-weight: 600; font-family: inherit;">
+                                <div style="font-size: 0.72rem; color: #4E627A; margin-top: 4px;">Quanto deseja economizar este ano?</div>
+                            </div>
+
+                            <!-- Total -->
+                            <div style="padding: 12px 14px; background: rgba(0,212,170,0.06);
+                                        border: 1px solid rgba(0,212,170,0.15); border-radius: 8px;
+                                        display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-size: 0.8rem; color: #94A3B8;">📊 Limite Total Mensal</span>
+                                <span style="font-size: 1.1rem; font-weight: 700; color: #00D4AA; font-variant-numeric: tabular-nums;">
+                                    AED ${formatAEDShort(state.goal + state.goalFixed)}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Separador -->
+                    <div style="border-top: 1px solid rgba(255,255,255,0.07);"></div>
+
+                    <!-- Secção Backup -->
+                    <div>
+                        <div style="font-size: 0.72rem; color: #4E627A; text-transform: uppercase;
+                                    letter-spacing: 0.08em; margin-bottom: 12px;">Dados</div>
+                        <button onclick="this.closest('.modal-overlay').remove(); downloadBackup();"
+                                style="width: 100%; padding: 13px; background: transparent;
+                                       border: 1px solid rgba(255,255,255,0.12); border-radius: 8px;
+                                       color: #94A3B8; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+                                       letter-spacing: 0.04em; text-transform: uppercase; transition: all 0.2s;
+                                       display: flex; align-items: center; justify-content: center; gap: 8px;"
+                                onmouseover="this.style.borderColor='rgba(0,212,170,0.4)'; this.style.color='#00D4AA';"
+                                onmouseout="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.color='#94A3B8';">
+                            💾 Download Backup (XLSX)
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+        `;
+
+        modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+        document.body.appendChild(modal);
     }
 
     function showToast(msg, type = 'success') {
@@ -4083,156 +4280,55 @@
                     </button>
                 </div>
                 
-                <!-- Card de Configuração de Limites -->
-                <div class="card">
-                    <h3 style="margin-bottom: 20px;">⚙️ Configuração de Limites</h3>
-                    
-                    <div class="input-group">
-                        <label class="label">💸 Limite Mensal - Despesas Variáveis (AED):</label>
-                        <input type="number" id="goalInput" value="${state.goal}" 
-                               onblur="updateGoal(this.value)" 
-                               style="font-size: 1.1rem; font-weight: 600;">
-                        <div style="font-size: 0.75rem; opacity: 0.7; margin-top: 5px;">
-                            Mercado, restaurante, transporte, etc.
-                        </div>
-                    </div>
-                    
-                    <div class="input-group" style="margin-top: 15px;">
-                        <label class="label">💳 Limite Mensal - Despesas Fixas (AED):</label>
-                        <input type="number" id="goalFixedInput" value="${state.goalFixed}" 
-                               onblur="updateGoalFixed(this.value)"
-                               style="font-size: 1.1rem; font-weight: 600;">
-                        <div style="font-size: 0.75rem; opacity: 0.7; margin-top: 5px;">
-                            Aluguel, contas, assinaturas, etc.
-                        </div>
-                    </div>
-                    
-                    <div style="
-                        margin-top: 20px;
-                        padding: 15px;
-                        background: rgba(59, 130, 246, 0.1);
-                        border-radius: 8px;
-                        border-left: 4px solid #3b82f6;
-                    ">
-                        <div style="font-size: 0.85rem; opacity: 0.9; margin-bottom: 8px;">
-                            📊 Limite Total Mensal
-                        </div>
-                        <div style="font-size: 1.8rem; font-weight: 700; color: #ffffff;">
-                            AED ${formatAEDShort(state.goal + state.goalFixed)}
-                        </div>
-                        <div style="font-size: 0.75rem; opacity: 0.7; margin-top: 5px;">
-                            Variáveis (${formatAEDShort(state.goal)}) + Fixas (${formatAEDShort(state.goalFixed)})
-                        </div>
-                    </div>
-                    
-                    <!-- Card de Meta Anual de Economia -->
-                    <div class="input-group" style="margin-top: 20px;">
-                        <label class="label">🎯 Meta de Economia Anual (AED):</label>
-                        <input type="number" id="yearlyGoalInput" value="${state.yearlyGoal}" 
-                               onblur="updateYearlyGoal(this.value)" 
-                               style="font-size: 1.1rem; font-weight: 600;">
-                        <div style="font-size: 0.75rem; opacity: 0.7; margin-top: 5px;">
-                            Quanto você deseja economizar este ano?
-                        </div>
-                    </div>
-                    
-                    <!-- Card de Rendimento Mensal -->
-                    <div style="
-                        margin-top: 20px;
-                        padding: 20px;
-                        background: rgba(34, 197, 94, 0.1);
-                        border-radius: 12px;
-                        border-left: 4px solid #22c55e;
-                    ">
-                        <div style="font-size: 1rem; font-weight: 600; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between;">
-                            <span>💰 Rendimento Mensal</span>
-                            <button onclick="toggleIncomeManager()" 
-                                style="padding: 8px 16px; background: rgba(255,255,255,0.2); border: none; 
-                                border-radius: 6px; color: white; font-weight: 600; cursor: pointer; font-size: 0.85rem;">
-                                📋 Gerenciar Todos
-                            </button>
-                        </div>
-                        ${(() => {
-                            const now = new Date();
-                            const currentMonthKey = now.getMonth() + 1 + '/' + now.getFullYear();
-                            const currentIncome = state.monthlyIncome[currentMonthKey] || 0;
-                            const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-                            
-                            let html = '<div style="margin-bottom: 15px;">';
-                            html += '<label style="display: block; font-size: 0.85rem; opacity: 0.9; margin-bottom: 8px;">';
-                            html += 'Rendimento de ' + monthNames[now.getMonth()] + ' ' + now.getFullYear();
-                            html += '</label>';
-                            html += '<div style="display: flex; gap: 10px; align-items: center;">';
-                            html += '<input type="number" id="monthlyIncomeInput" placeholder="Ex: 15000" ';
-                            html += 'value="' + (currentIncome || '') + '" ';
-                            html += 'style="flex: 1; padding: 12px; border: 2px solid rgba(34, 197, 94, 0.3); ';
-                            html += 'border-radius: 8px; background: rgba(255,255,255,0.1); color: white; ';
-                            html += 'font-size: 1rem; font-weight: 600;" />';
-                            html += '<button onclick="saveMonthlyIncome()" ';
-                            html += 'style="padding: 12px 20px; background: #22c55e; border: none; ';
-                            html += 'border-radius: 8px; color: white; font-weight: 600; cursor: pointer; white-space: nowrap;">';
-                            html += '💾 Salvar</button>';
-                            html += '</div></div>';
-                            
-                            if (currentIncome > 0) {
-                                // ===== CORREÇÃO: Incluir despesas fixas no cálculo =====
-                                const currentMonthFixed = state.monthlyFixedExpenses[currentMonthKey] || [];
-                                const fixedTotal = currentMonthFixed.reduce((sum, f) => sum + (parseFloat(f.amount) || 0), 0);
-                                const totalWithFixed = total + fixedTotal;
-                                
-                                const economy = currentIncome - totalWithFixed;
-                                const economyPercent = (economy / currentIncome * 100);
-                                const spentPercent = (totalWithFixed / currentIncome * 100);
-                                
-                                // Nova lógica de cores baseada no percentual gasto
-                                let statusColor, statusBg, statusIcon, statusText;
-                                if (spentPercent < 100) {
-                                    // Verde - Gastou menos que o rendimento (economia positiva)
-                                    statusColor = '#22c55e';
-                                    statusBg = 'rgba(34, 197, 94, 0.15)';
-                                    statusIcon = '🎉';
-                                    statusText = 'Você guardou ' + economyPercent.toFixed(1) + '% do seu rendimento!';
-                                } else if (spentPercent === 100) {
-                                    // Amarelo - Gastou exatamente o rendimento
-                                    statusColor = '#f59e0b';
-                                    statusBg = 'rgba(245, 158, 11, 0.15)';
-                                    statusIcon = '⚠️';
-                                    statusText = 'Você gastou exatamente 100% do seu rendimento';
-                                } else {
-                                    // Vermelho - Gastou mais que o rendimento
-                                    statusColor = '#ef4444';
-                                    statusBg = 'rgba(239, 68, 68, 0.15)';
-                                    statusIcon = '🚨';
-                                    statusText = 'Gastou AED ' + Math.abs(economy).toFixed(0) + ' a mais que o rendimento (' + spentPercent.toFixed(1) + '%)';
-                                }
-                                
-                                html += '<div style="padding: 12px; ';
-                                html += 'background: ' + statusBg + '; ';
-                                html += 'border-radius: 8px; margin-top: 10px;">';
-                                html += '<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; font-size: 0.85rem;">';
-                                html += '<div><div style="opacity: 0.8;">💰 Rendimento</div>';
-                                html += '<div style="font-size: 1.1rem; font-weight: 700; color: #22c55e;">AED ' + currentIncome.toFixed(0) + '</div></div>';
-                                html += '<div><div style="opacity: 0.8;">💸 Variáveis</div>';
-                                html += '<div style="font-size: 1.1rem; font-weight: 700; color: #ef4444;">AED ' + total.toFixed(0) + '</div></div>';
-                                html += '<div><div style="opacity: 0.8;">🔒 Fixas</div>';
-                                html += '<div style="font-size: 1.1rem; font-weight: 700; color: #f59e0b;">AED ' + fixedTotal.toFixed(0) + '</div></div>';
-                                html += '<div style="grid-column: 1 / -1; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.2);">';
-                                html += '<div style="display: flex; justify-content: space-between; margin-bottom: 10px;">';
-                                html += '<div style="opacity: 0.8;">📊 Total Despesas</div>';
-                                html += '<div style="font-weight: 700;">AED ' + totalWithFixed.toFixed(0) + '</div>';
-                                html += '</div>';
-                                html += '<div style="opacity: 0.8;">' + statusIcon + ' Economia</div>';
-                                html += '<div style="font-size: 1.3rem; font-weight: 700; color: ' + statusColor + ';">';
-                                html += (economy > 0 ? '+' : '') + 'AED ' + economy.toFixed(0) + '</div>';
-                                html += '<div style="font-size: 0.75rem; opacity: 0.7; margin-top: 5px;">';
-                                html += statusText;
-                                html += '</div></div></div></div>';
-                            }
-                            
-                            return html;
-                        })()}
-                    </div>
-                </div>
+                <!-- Rendimento Mensal -->
+                ${(() => {
+                    const now = new Date();
+                    const currentMonthKey = now.getMonth() + 1 + '/' + now.getFullYear();
+                    const currentIncome = state.monthlyIncome[currentMonthKey] || 0;
+                    const monthNames = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+                    const monthExpenses = getMonthExpenses();
+                    const total = monthExpenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+
+                    let html = '<div style="margin-top: 16px; padding: 20px; background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.15); border-radius: 12px; border-left: 3px solid #22c55e;">';
+                    html += '<div style="font-size: 1rem; font-weight: 600; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between;">';
+                    html += '<span style="color: #F0F4FF;">💰 Rendimento Mensal</span>';
+                    html += '<button onclick="toggleIncomeManager()" style="padding: 8px 14px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #94A3B8; font-weight: 600; cursor: pointer; font-size: 0.8rem;">📋 Gerir Todos</button>';
+                    html += '</div>';
+                    html += '<label style="display: block; font-size: 0.78rem; color: #94A3B8; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em;">';
+                    html += 'Rendimento de ' + monthNames[now.getMonth()] + ' ' + now.getFullYear();
+                    html += '</label>';
+                    html += '<div style="display: flex; gap: 8px; align-items: center;">';
+                    html += '<input type="number" id="monthlyIncomeInput" placeholder="Ex: 20000" ';
+                    html += 'value="' + (currentIncome || '') + '" ';
+                    html += 'style="flex: 1; padding: 11px 14px; border: 1px solid rgba(34,197,94,0.2); border-radius: 8px; background: rgba(255,255,255,0.05); color: #F0F4FF; font-size: 1rem; font-weight: 600; font-family: inherit;" />';
+                    html += '<button onclick="saveMonthlyIncome()" style="padding: 11px 18px; background: #22c55e; border: none; border-radius: 8px; color: #080D1A; font-weight: 700; cursor: pointer; white-space: nowrap; font-size: 0.85rem;">💾 Salvar</button>';
+                    html += '</div>';
+
+                    if (currentIncome > 0) {
+                        const currentMonthFixed = state.monthlyFixedExpenses[currentMonthKey] || [];
+                        const fixedTotal = currentMonthFixed.reduce((sum, f) => sum + (parseFloat(f.amount) || 0), 0);
+                        const totalWithFixed = total + fixedTotal;
+                        const economy = currentIncome - totalWithFixed;
+                        const spentPercent = (totalWithFixed / currentIncome * 100);
+                        let statusColor, statusIcon, statusText;
+                        if (spentPercent < 100) { statusColor = '#22c55e'; statusIcon = '🎉'; statusText = 'Guardou ' + (100 - spentPercent).toFixed(1) + '% do rendimento'; }
+                        else if (spentPercent === 100) { statusColor = '#f59e0b'; statusIcon = '⚠️'; statusText = 'Gastou exactamente 100% do rendimento'; }
+                        else { statusColor = '#ef4444'; statusIcon = '🚨'; statusText = 'Gastou AED ' + Math.abs(economy).toFixed(0) + ' a mais (' + spentPercent.toFixed(1) + '%)'; }
+                        html += '<div style="margin-top: 12px; padding: 12px; background: rgba(255,255,255,0.04); border-radius: 8px;">';
+                        html += '<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; font-size: 0.82rem; margin-bottom: 10px;">';
+                        html += '<div><div style="color: #94A3B8; margin-bottom: 2px;">💰 Rendimento</div><div style="font-weight: 700; color: #22c55e; font-variant-numeric: tabular-nums;">AED ' + currentIncome.toFixed(0) + '</div></div>';
+                        html += '<div><div style="color: #94A3B8; margin-bottom: 2px;">💸 Variáveis</div><div style="font-weight: 700; color: #ef4444; font-variant-numeric: tabular-nums;">AED ' + total.toFixed(0) + '</div></div>';
+                        html += '<div><div style="color: #94A3B8; margin-bottom: 2px;">🔒 Fixas</div><div style="font-weight: 700; color: #f59e0b; font-variant-numeric: tabular-nums;">AED ' + fixedTotal.toFixed(0) + '</div></div>';
+                        html += '</div>';
+                        html += '<div style="padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.07); display: flex; justify-content: space-between; align-items: center;">';
+                        html += '<div style="font-size: 0.8rem; color: #94A3B8;">' + statusIcon + ' ' + statusText + '</div>';
+                        html += '<div style="font-size: 1.1rem; font-weight: 700; color: ' + statusColor + '; font-variant-numeric: tabular-nums;">' + (economy >= 0 ? '+' : '') + 'AED ' + economy.toFixed(0) + '</div>';
+                        html += '</div></div>';
+                    }
+
+                    html += '</div>';
+                    return html;
+                })()}
             `;
             setTimeout(() => {
                 const smsInput = document.getElementById('smsInput');
