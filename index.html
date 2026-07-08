@@ -1181,51 +1181,42 @@
 
         // Capturar o SMS do campo antes de processar
         const smsInput = document.getElementById('smsInput');
-        if (smsInput) {
-            state.sms = smsInput.value;
-        }
-        
-        // Capturar observação
+        if (smsInput) { state.sms = smsInput.value; }
+
         const obsInput = document.getElementById('obsInput');
-        if (obsInput) {
-            state.obs = obsInput.value;
-        }
-        
+        if (obsInput) { state.obs = obsInput.value; }
+
         const parsed = parseSMS(state.sms);
         if (!parsed) {
+            state.saving = false;
             alert('❌ Não consegui extrair os dados. Verifique o formato do SMS.');
             return;
         }
-
         if (!state.selectedCategory) {
+            state.saving = false;
             alert('❌ Por favor, selecione uma categoria para a despesa.');
             return;
         }
 
+        // ✅ ID único gerado no momento do clique — cada tentativa tem ID diferente,
+        // evitando duplicações com o mesmo ID em caso de retentativa com internet lenta
+        parsed.id = String(Date.now());
         parsed.category = state.selectedCategory;
         parsed.obs = state.obs || '';
 
         const btn = document.querySelector('.btn-add-expense');
-        if (btn) {
-            btn.disabled = true;
-            btn.textContent = 'Salvando...';
-        }
+        if (btn) { btn.disabled = true; btn.textContent = 'Salvando...'; }
 
         const success = await addExpenseToSheets(parsed);
 
-        // Sempre reabilitar o botão e liberar o lock, independente do resultado
+        // Sempre reabilitar o botão e liberar o lock
         state.saving = false;
-        if (btn) {
-            btn.disabled = false;
-            btn.textContent = 'Extrair e Adicionar';
-        }
-        
+        if (btn) { btn.disabled = false; btn.textContent = 'Extrair e Adicionar'; }
+
         if (success) {
-            // ✅ OTIMIZAÇÃO: Atualizar state localmente sem recarregar tudo do servidor
-            parsed.id = String(parsed.id); // Garantir mesmo tipo que vem do servidor
+            // ✅ OTIMIZAÇÃO: Atualizar state localmente sem recarregar
             state.expenses.push(parsed);
             updateCache();
-
             state.sms = '';
             state.obs = '';
             state.selectedCategory = null;
@@ -1689,7 +1680,7 @@
         }
         
         const fixedExpense = {
-            id: Date.now(),
+            id: String(Date.now()), // ✅ ID único gerado no momento do clique
             name: name,
             amount: parseFloat(amount),
             day: parseInt(day),
