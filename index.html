@@ -6,6 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Minhas Despesas</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
@@ -552,8 +555,20 @@
 </div>
 
 <script>
+    // Global error handler — captura erros de runtime
+    window.addEventListener('error', function(e) {
+        console.error('❌ RUNTIME ERROR:', e.message, 'at', e.filename, 'line', e.lineno);
+        const app = document.getElementById('app');
+        if (app && app.innerHTML.trim() === '') {
+            app.innerHTML = '<div style="padding:20px;color:#ef4444;font-family:monospace;font-size:0.85rem;">' +
+                '❌ Erro ao carregar o app:<br><br>' + e.message + '<br>Linha: ' + e.lineno +
+                '<br><br><button onclick="location.reload()" style="padding:8px 16px;background:#00D4AA;border:none;border-radius:8px;color:#080D1A;font-weight:700;cursor:pointer;">↻ Recarregar</button>' +
+                '</div>';
+        }
+    });
+
     // ⚠️ IMPORTANTE: COLE SUA URL DO GOOGLE SHEETS AQUI
-    const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbwEswF9iD732EPa1dD6IEhjXR0CpbE2nWVrhVyr_oiyI6S0Fz9yTzvqA3l7-6Wg-Mn0/exec';
+    const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbxVLkLhhtW9wsGJfHx07y6trLtjYZJvFbq4oriMQ6gnGCMC4rfhZIkNAbP7Y2vKY4q-4w/exec';
 
     // Categorias padrão
     const CATEGORIES = [
@@ -1223,6 +1238,71 @@
             showToast(`✅ Moeda alterada para ${cur} (cache local)`);
         }
         return true;
+    }
+
+    function renderPeriodSummary(months, expensesByMonth) {
+        if (!state.histPeriodStart && !state.histPeriodEnd) return '';
+
+        const filteredMonths = months.filter(monthYear => {
+            const [m, y] = monthYear.split('/').map(Number);
+            const monthDate = y + '-' + String(m).padStart(2,'0');
+            const afterStart = !state.histPeriodStart || monthDate >= state.histPeriodStart;
+            const beforeEnd  = !state.histPeriodEnd   || monthDate <= state.histPeriodEnd;
+            return afterStart && beforeEnd;
+        });
+
+        if (filteredMonths.length === 0) {
+            return '<div style="text-align:center; padding: 20px; color: var(--text-3); font-size: 0.9rem;">Nenhuma despesa neste período</div>';
+        }
+
+        const periodVariavel = filteredMonths.reduce((sum, m) =>
+            sum + (expensesByMonth[m] || []).reduce((s, e) => s + (parseFloat(e.amount)||0), 0), 0);
+        const periodFixo = filteredMonths.reduce((sum, m) =>
+            sum + (state.monthlyFixedExpenses[m] || []).reduce((s, f) => s + (parseFloat(f.amount)||0), 0), 0);
+        const periodTotal = periodVariavel + periodFixo;
+        const periodIncome = filteredMonths.reduce((sum, m) => {
+            const [mo, ye] = m.split('/').map(Number);
+            const key = mo + '/' + ye;
+            return sum + (state.monthlyIncome[key] || state.monthlyIncome[m] || 0);
+        }, 0);
+        const periodEconomy = periodIncome - periodTotal;
+        const numMonths = filteredMonths.length;
+
+        const statCard = (icon, label, color, value, avg) =>
+            '<div style="background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px;">' +
+            '<div style="font-size: 0.7rem; color: var(--text-2); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em;">' + icon + ' ' + label + '</div>' +
+            '<div style="font-size: 1.1rem; font-weight: 700; color: ' + color + '; font-variant-numeric: tabular-nums;">' + value + '</div>' +
+            '<div style="font-size: 0.7rem; color: var(--text-3); margin-top: 2px;">' + avg + '</div>' +
+            '</div>';
+
+        let html = '<div style="background: var(--surface); border: 1px solid rgba(0,212,170,0.2); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 16px; border-left: 3px solid var(--teal);">';
+        html += '<div style="font-size: 0.72rem; color: var(--teal); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 14px;">📊 Resumo — ' + numMonths + ' ' + (numMonths === 1 ? 'mês' : 'meses') + ' selecionados</div>';
+        html += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">';
+        html += statCard('💸', 'Variáveis', '#ef4444', formatAED(periodVariavel), 'Média ' + formatAED(periodVariavel/numMonths) + '/mês');
+        html += statCard('🔒', 'Fixas', '#f59e0b', formatAED(periodFixo), 'Média ' + formatAED(periodFixo/numMonths) + '/mês');
+        html += statCard('📦', 'Total Gasto', 'var(--text-1)', formatAED(periodTotal), 'Média ' + formatAED(periodTotal/numMonths) + '/mês');
+        html += statCard('💰', 'Rendimento', '#22c55e',
+            periodIncome > 0 ? formatAED(periodIncome) : '—',
+            periodIncome > 0 ? 'Média ' + formatAED(periodIncome/numMonths) + '/mês' : 'Sem dados');
+        html += '</div>';
+
+        if (periodIncome > 0) {
+            const econColor = periodEconomy >= 0 ? '#22c55e' : '#ef4444';
+            const econBg    = periodEconomy >= 0 ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)';
+            const econBorder= periodEconomy >= 0 ? 'rgba(34,197,94,0.2)'  : 'rgba(239,68,68,0.2)';
+            const econLabel = periodEconomy >= 0 ? '🎉 Total Economizado' : '🚨 Total Déficit';
+            html += '<div style="padding: 12px; background: ' + econBg + '; border: 1px solid ' + econBorder + '; border-radius: var(--radius-sm); display: flex; justify-content: space-between; align-items: center;">';
+            html += '<div>';
+            html += '<div style="font-size: 0.72rem; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.05em;">' + econLabel + '</div>';
+            html += '<div style="font-size: 0.72rem; color: var(--text-3); margin-top: 2px;">Média ' + formatAED(Math.abs(periodEconomy)/numMonths) + '/mês</div>';
+            html += '</div>';
+            html += '<div style="font-size: 1.3rem; font-weight: 700; color: ' + econColor + '; font-variant-numeric: tabular-nums;">';
+            html += (periodEconomy >= 0 ? '+' : '') + formatAED(periodEconomy);
+            html += '</div></div>';
+        }
+
+        html += '</div>';
+        return html;
     }
 
     function openSettings() {
@@ -5319,69 +5399,7 @@
                     </div>
 
                     <!-- Resumo do Período (só aparece quando há filtro activo) -->
-                    ${(() => {
-                        if (!state.histPeriodStart && !state.histPeriodEnd) return '';
-
-                        const filteredMonths = months.filter(monthYear => {
-                            const [m, y] = monthYear.split('/').map(Number);
-                            const monthDate = y + '-' + String(m).padStart(2,'0');
-                            const afterStart = !state.histPeriodStart || monthDate >= state.histPeriodStart;
-                            const beforeEnd  = !state.histPeriodEnd   || monthDate <= state.histPeriodEnd;
-                            return afterStart && beforeEnd;
-                        });
-
-                        if (filteredMonths.length === 0) return '<div style="text-align:center; padding: 20px; color: var(--text-3); font-size: 0.9rem;">Nenhuma despesa neste período</div>';
-
-                        const periodVariavel = filteredMonths.reduce((sum, m) => sum + (expensesByMonth[m] || []).reduce((s, e) => s + (parseFloat(e.amount)||0), 0), 0);
-                        const periodFixo = filteredMonths.reduce((sum, m) => sum + (state.monthlyFixedExpenses[m] || []).reduce((s, f) => s + (parseFloat(f.amount)||0), 0), 0);
-                        const periodTotal = periodVariavel + periodFixo;
-                        const periodIncome = filteredMonths.reduce((sum, m) => {
-                            const [mo, ye] = m.split('/').map(Number);
-                            const key = mo + '/' + ye;
-                            return sum + (state.monthlyIncome[key] || state.monthlyIncome[m] || 0);
-                        }, 0);
-                        const periodEconomy = periodIncome - periodTotal;
-                        const numMonths = filteredMonths.length;
-                        const cur = state.currency || 'AED';
-
-                        return \`<div style="background: var(--surface); border: 1px solid rgba(0,212,170,0.2); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 16px; border-left: 3px solid var(--teal);">
-                            <div style="font-size: 0.72rem; color: var(--teal); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 14px;">
-                                📊 Resumo — \${numMonths} \${numMonths === 1 ? 'mês' : 'meses'} seleccionados
-                            </div>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
-                                <div style="background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px;">
-                                    <div style="font-size: 0.7rem; color: var(--text-2); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em;">💸 Variáveis</div>
-                                    <div style="font-size: 1.1rem; font-weight: 700; color: #ef4444; font-variant-numeric: tabular-nums;">\${formatAED(periodVariavel)}</div>
-                                    <div style="font-size: 0.7rem; color: var(--text-3); margin-top: 2px;">Média \${formatAED(periodVariavel/numMonths)}/mês</div>
-                                </div>
-                                <div style="background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px;">
-                                    <div style="font-size: 0.7rem; color: var(--text-2); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em;">🔒 Fixas</div>
-                                    <div style="font-size: 1.1rem; font-weight: 700; color: #f59e0b; font-variant-numeric: tabular-nums;">\${formatAED(periodFixo)}</div>
-                                    <div style="font-size: 0.7rem; color: var(--text-3); margin-top: 2px;">Média \${formatAED(periodFixo/numMonths)}/mês</div>
-                                </div>
-                                <div style="background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px;">
-                                    <div style="font-size: 0.7rem; color: var(--text-2); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em;">📦 Total Gasto</div>
-                                    <div style="font-size: 1.1rem; font-weight: 700; color: var(--text-1); font-variant-numeric: tabular-nums;">\${formatAED(periodTotal)}</div>
-                                    <div style="font-size: 0.7rem; color: var(--text-3); margin-top: 2px;">Média \${formatAED(periodTotal/numMonths)}/mês</div>
-                                </div>
-                                <div style="background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px;">
-                                    <div style="font-size: 0.7rem; color: var(--text-2); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em;">💰 Rendimento</div>
-                                    <div style="font-size: 1.1rem; font-weight: 700; color: #22c55e; font-variant-numeric: tabular-nums;">\${periodIncome > 0 ? formatAED(periodIncome) : '—'}</div>
-                                    <div style="font-size: 0.7rem; color: var(--text-3); margin-top: 2px;">\${periodIncome > 0 ? 'Média ' + formatAED(periodIncome/numMonths) + '/mês' : 'Sem dados'}</div>
-                                </div>
-                            </div>
-                            \${periodIncome > 0 ? \`
-                            <div style="padding: 12px; background: \${periodEconomy >= 0 ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)'}; border: 1px solid \${periodEconomy >= 0 ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}; border-radius: var(--radius-sm); display: flex; justify-content: space-between; align-items: center;">
-                                <div>
-                                    <div style="font-size: 0.72rem; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.05em;">\${periodEconomy >= 0 ? '🎉 Total Economizado' : '🚨 Total Déficit'}</div>
-                                    <div style="font-size: 0.72rem; color: var(--text-3); margin-top: 2px;">Média \${formatAED(Math.abs(periodEconomy)/numMonths)}/mês</div>
-                                </div>
-                                <div style="font-size: 1.3rem; font-weight: 700; color: \${periodEconomy >= 0 ? '#22c55e' : '#ef4444'}; font-variant-numeric: tabular-nums;">
-                                    \${periodEconomy >= 0 ? '+' : ''}\${formatAED(periodEconomy)}
-                                </div>
-                            </div>\` : ''}
-                        </div>\`;
-                    })()}
+                    ${renderPeriodSummary(months, expensesByMonth)}
 
                     <div class="expand-controls">
                         <button onclick="expandAllMonths()">📂 Expandir Todos</button>
