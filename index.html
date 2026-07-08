@@ -660,8 +660,8 @@
         manualEntry: false,  // Controla se está em modo manual ou SMS
         saving: false,  // Lock para evitar duplo envio
         currency: 'AED',  // Moeda do sistema
-        histPeriodStart: '',  // Filtro período histórico
-        histPeriodEnd: ''     // Filtro período histórico
+        histDateStart: '',  // Filtro data início histórico
+        histDateEnd: ''     // Filtro data fim histórico
     };
 
     // Carregar dados do Google Sheets
@@ -1240,23 +1240,83 @@
         return true;
     }
 
-    function renderPeriodSummary(months, expensesByMonth) {
-        if (!state.histPeriodStart && !state.histPeriodEnd) return '';
+    function renderFilteredExpenses(expenses) {
+        // Filtrar despesas do mês pelo período seleccionado
+        const visibleExpenses = (state.histDateStart || state.histDateEnd)
+            ? expenses.filter(e => {
+                if (!e.date) return false;
+                const p = e.date.split('/');
+                if (p.length < 3) return false;
+                const eDate = p[2] + '-' + p[1].padStart(2,'0') + '-' + p[0].padStart(2,'0');
+                const afterStart = !state.histDateStart || eDate >= state.histDateStart;
+                const beforeEnd  = !state.histDateEnd   || eDate <= state.histDateEnd;
+                return afterStart && beforeEnd;
+            })
+            : expenses;
 
-        const filteredMonths = months.filter(monthYear => {
-            const [m, y] = monthYear.split('/').map(Number);
-            const monthDate = y + '-' + String(m).padStart(2,'0');
-            const afterStart = !state.histPeriodStart || monthDate >= state.histPeriodStart;
-            const beforeEnd  = !state.histPeriodEnd   || monthDate <= state.histPeriodEnd;
-            return afterStart && beforeEnd;
+        return visibleExpenses.map(e => {
+            const amount   = parseFloat(e.amount) || 0;
+            const merchant = e.merchant || 'Sem nome';
+            const date     = e.date || '';
+            const time     = e.time || '';
+            const category = e.category || 'outros';
+            const obs      = e.obs || '';
+            const catColor = getCategoryColor(category);
+            const catIcon  = getCategoryIcon(category);
+            const catName  = getCategoryName(category);
+            const cur      = state.currency || 'AED';
+
+            return '<div class="expense-item">' +
+                '<div class="expense-info">' +
+                    '<div class="expense-merchant">' + merchant + '</div>' +
+                    '<div class="expense-date">' + date + ' às ' + time + '</div>' +
+                    (obs ? '<div class="expense-date" style="font-style: italic; margin-top: 4px;">💬 ' + obs + '</div>' : '') +
+                    '<span class="expense-category" style="background: ' + catColor + '">' + catIcon + ' ' + catName + '</span>' +
+                '</div>' +
+                '<div style="display:flex; align-items:center;">' +
+                    '<div class="expense-amount">' + cur + ' ' + amount.toFixed(2) + '</div>' +
+                    '<button class="edit-btn" onclick="startEditExpense(\"' + e.id + '\")">✏️</button>' +
+                    '<button class="delete-btn" onclick="deleteExpense(\"' + e.id + '\")">🗑️</button>' +
+                '</div>' +
+            '</div>';
+        }).join('');
+    }
+
+    function renderPeriodSummary(months, expensesByMonth) {
+        if (!state.histDateStart && !state.histDateEnd) return '';
+
+        // Função auxiliar: converte DD/MM/YYYY → YYYY-MM-DD para comparação
+        function toISO(dateStr) {
+            if (!dateStr) return '';
+            const p = dateStr.split('/');
+            if (p.length < 3) return '';
+            return p[2] + '-' + p[1].padStart(2,'0') + '-' + p[0].padStart(2,'0');
+        }
+
+        // Filtrar despesas individualmente por data
+        const allFiltered = [];
+        const filteredMonthsSet = new Set();
+        months.forEach(monthYear => {
+            (expensesByMonth[monthYear] || []).forEach(e => {
+                const eDate = toISO(e.date);
+                if (!eDate) return;
+                const afterStart = !state.histDateStart || eDate >= state.histDateStart;
+                const beforeEnd  = !state.histDateEnd   || eDate <= state.histDateEnd;
+                if (afterStart && beforeEnd) {
+                    allFiltered.push(e);
+                    filteredMonthsSet.add(monthYear);
+                }
+            });
         });
 
-        if (filteredMonths.length === 0) {
+        const filteredMonths = [...filteredMonthsSet];
+
+        if (allFiltered.length === 0) {
             return '<div style="text-align:center; padding: 20px; color: var(--text-3); font-size: 0.9rem;">Nenhuma despesa neste período</div>';
         }
 
-        const periodVariavel = filteredMonths.reduce((sum, m) =>
-            sum + (expensesByMonth[m] || []).reduce((s, e) => s + (parseFloat(e.amount)||0), 0), 0);
+        const periodVariavel = allFiltered.reduce((sum, e) => sum + (parseFloat(e.amount)||0), 0);
+        // Fixas: incluir os meses que têm despesas no período (proporcional não é viável, inclui o mês completo)
         const periodFixo = filteredMonths.reduce((sum, m) =>
             sum + (state.monthlyFixedExpenses[m] || []).reduce((s, f) => s + (parseFloat(f.amount)||0), 0), 0);
         const periodTotal = periodVariavel + periodFixo;
@@ -1267,6 +1327,9 @@
         }, 0);
         const periodEconomy = periodIncome - periodTotal;
         const numMonths = filteredMonths.length;
+        const numDays = state.histDateStart && state.histDateEnd
+            ? Math.round((new Date(state.histDateEnd) - new Date(state.histDateStart)) / 86400000) + 1
+            : null;
 
         const statCard = (icon, label, color, value, avg) =>
             '<div style="background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px;">' +
@@ -1276,14 +1339,15 @@
             '</div>';
 
         let html = '<div style="background: var(--surface); border: 1px solid rgba(0,212,170,0.2); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 16px; border-left: 3px solid var(--teal);">';
-        html += '<div style="font-size: 0.72rem; color: var(--teal); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 14px;">📊 Resumo — ' + numMonths + ' ' + (numMonths === 1 ? 'mês' : 'meses') + ' selecionados</div>';
+        const periodLabel = numDays !== null ? (numDays + ' ' + (numDays === 1 ? 'dia' : 'dias')) : (numMonths + ' ' + (numMonths === 1 ? 'mês' : 'meses'));
+        html += '<div style="font-size: 0.72rem; color: var(--teal); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 14px;">📊 Resumo — ' + periodLabel + ' · ' + allFiltered.length + ' despesas</div>';
         html += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">';
-        html += statCard('💸', 'Variáveis', '#ef4444', formatAED(periodVariavel), 'Média ' + formatAED(periodVariavel/numMonths) + '/mês');
-        html += statCard('🔒', 'Fixas', '#f59e0b', formatAED(periodFixo), 'Média ' + formatAED(periodFixo/numMonths) + '/mês');
-        html += statCard('📦', 'Total Gasto', 'var(--text-1)', formatAED(periodTotal), 'Média ' + formatAED(periodTotal/numMonths) + '/mês');
+        html += statCard('💸', 'Variáveis', '#ef4444', formatAED(periodVariavel), numDays ? 'Média ' + formatAED(periodVariavel/numDays) + '/dia' : 'Média ' + formatAED(periodVariavel/numMonths) + '/mês');
+        html += statCard('🔒', 'Fixas', '#f59e0b', formatAED(periodFixo), numMonths > 0 ? 'Média ' + formatAED(periodFixo/numMonths) + '/mês' : '');
+        html += statCard('📦', 'Total Gasto', 'var(--text-1)', formatAED(periodTotal), numDays ? 'Média ' + formatAED(periodTotal/numDays) + '/dia' : 'Média ' + formatAED(periodTotal/numMonths) + '/mês');
         html += statCard('💰', 'Rendimento', '#22c55e',
             periodIncome > 0 ? formatAED(periodIncome) : '—',
-            periodIncome > 0 ? 'Média ' + formatAED(periodIncome/numMonths) + '/mês' : 'Sem dados');
+            periodIncome > 0 ? numMonths > 0 ? 'Média ' + formatAED(periodIncome/numMonths) + '/mês' : '' : 'Sem dados');
         html += '</div>';
 
         if (periodIncome > 0) {
@@ -5352,47 +5416,49 @@
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
                             <div>
                                 <label style="font-size: 0.72rem; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 5px;">De</label>
-                                <input type="month" id="histPeriodStart"
-                                    value="${state.histPeriodStart}"
-                                    onchange="state.histPeriodStart = this.value; render();"
+                                <input type="date" id="histDateStart"
+                                    value="${state.histDateStart}"
+                                    onchange="state.histDateStart = this.value; render();"
                                     style="width: 100%; padding: 9px 10px; background: var(--surface-2); border: 1px solid var(--border-2); border-radius: var(--radius-sm); color: var(--text-1); font-size: 0.85rem; font-family: inherit; color-scheme: dark;">
                             </div>
                             <div>
                                 <label style="font-size: 0.72rem; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 5px;">Até</label>
-                                <input type="month" id="histPeriodEnd"
-                                    value="${state.histPeriodEnd}"
-                                    onchange="state.histPeriodEnd = this.value; render();"
+                                <input type="date" id="histDateEnd"
+                                    value="${state.histDateEnd}"
+                                    onchange="state.histDateEnd = this.value; render();"
                                     style="width: 100%; padding: 9px 10px; background: var(--surface-2); border: 1px solid var(--border-2); border-radius: var(--radius-sm); color: var(--text-1); font-size: 0.85rem; font-family: inherit; color-scheme: dark;">
                             </div>
                         </div>
-                        <div style="display: flex; gap: 8px;">
+                        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
                             <button onclick="
-                                const now = new Date();
-                                state.histPeriodStart = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
-                                state.histPeriodEnd = state.histPeriodStart;
-                                render();" 
-                                style="flex: 1; padding: 7px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-2); font-size: 0.72rem; cursor: pointer; transition: all 0.2s;"
+                                const n = new Date();
+                                const s = d => d.toISOString().split('T')[0];
+                                state.histDateStart = s(n); state.histDateEnd = s(n); render();"
+                                style="flex: 1; min-width: 60px; padding: 7px 4px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-2); font-size: 0.7rem; cursor: pointer; transition: all 0.2s;"
                                 onmouseover="this.style.borderColor='var(--teal)'; this.style.color='var(--teal)';"
-                                onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--text-2)';">Mês Atual</button>
+                                onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--text-2)';">Hoje</button>
                             <button onclick="
-                                const now = new Date();
-                                state.histPeriodStart = now.getFullYear() + '-01';
-                                state.histPeriodEnd = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
-                                render();"
-                                style="flex: 1; padding: 7px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-2); font-size: 0.72rem; cursor: pointer; transition: all 0.2s;"
+                                const n = new Date(); const s = d => d.toISOString().split('T')[0];
+                                const day = n.getDay(); const mon = new Date(n); mon.setDate(n.getDate() - (day === 0 ? 6 : day - 1));
+                                state.histDateStart = s(mon); state.histDateEnd = s(n); render();"
+                                style="flex: 1; min-width: 60px; padding: 7px 4px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-2); font-size: 0.7rem; cursor: pointer; transition: all 0.2s;"
                                 onmouseover="this.style.borderColor='var(--teal)'; this.style.color='var(--teal)';"
-                                onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--text-2)';">Ano Atual</button>
+                                onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--text-2)';">Semana</button>
                             <button onclick="
-                                const now = new Date();
-                                const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth()-5, 1);
-                                state.histPeriodStart = sixMonthsAgo.getFullYear() + '-' + String(sixMonthsAgo.getMonth()+1).padStart(2,'0');
-                                state.histPeriodEnd = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
-                                render();"
-                                style="flex: 1; padding: 7px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-2); font-size: 0.72rem; cursor: pointer; transition: all 0.2s;"
+                                const n = new Date(); const s = d => d.toISOString().split('T')[0];
+                                const first = new Date(n.getFullYear(), n.getMonth(), 1);
+                                state.histDateStart = s(first); state.histDateEnd = s(n); render();"
+                                style="flex: 1; min-width: 60px; padding: 7px 4px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-2); font-size: 0.7rem; cursor: pointer; transition: all 0.2s;"
                                 onmouseover="this.style.borderColor='var(--teal)'; this.style.color='var(--teal)';"
-                                onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--text-2)';">6 Meses</button>
-                            <button onclick="state.histPeriodStart = ''; state.histPeriodEnd = ''; render();"
-                                style="flex: 1; padding: 7px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-2); font-size: 0.72rem; cursor: pointer; transition: all 0.2s;"
+                                onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--text-2)';">Mês</button>
+                            <button onclick="
+                                const n = new Date(); const s = d => d.toISOString().split('T')[0];
+                                state.histDateStart = n.getFullYear() + '-01-01'; state.histDateEnd = s(n); render();"
+                                style="flex: 1; min-width: 60px; padding: 7px 4px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-2); font-size: 0.7rem; cursor: pointer; transition: all 0.2s;"
+                                onmouseover="this.style.borderColor='var(--teal)'; this.style.color='var(--teal)';"
+                                onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--text-2)';">Ano</button>
+                            <button onclick="state.histDateStart = ''; state.histDateEnd = ''; render();"
+                                style="flex: 1; min-width: 60px; padding: 7px 4px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-2); font-size: 0.7rem; cursor: pointer; transition: all 0.2s;"
                                 onmouseover="this.style.borderColor='#ef4444'; this.style.color='#ef4444';"
                                 onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--text-2)';">Limpar</button>
                         </div>
@@ -5406,12 +5472,18 @@
                         <button onclick="collapseAllMonths()">📁 Colapsar Todos</button>
                     </div>` +
                     months.filter(monthYear => {
-                        if (!state.histPeriodStart && !state.histPeriodEnd) return true;
-                        const [m, y] = monthYear.split('/').map(Number);
-                        const monthDate = y + '-' + String(m).padStart(2,'0');
-                        const afterStart = !state.histPeriodStart || monthDate >= state.histPeriodStart;
-                        const beforeEnd  = !state.histPeriodEnd   || monthDate <= state.histPeriodEnd;
-                        return afterStart && beforeEnd;
+                        if (!state.histDateStart && !state.histDateEnd) return true;
+                        // Verificar se o mês tem alguma despesa dentro do intervalo de datas
+                        const expenses = expensesByMonth[monthYear] || [];
+                        return expenses.some(e => {
+                            if (!e.date) return false;
+                            const parts = e.date.split('/');
+                            if (parts.length < 3) return false;
+                            const eDate = parts[2] + '-' + parts[1].padStart(2,'0') + '-' + parts[0].padStart(2,'0');
+                            const afterStart = !state.histDateStart || eDate >= state.histDateStart;
+                            const beforeEnd  = !state.histDateEnd   || eDate <= state.histDateEnd;
+                            return afterStart && beforeEnd;
+                        });
                     }).map(monthYear => {
                         const [month, year] = monthYear.split('/').map(Number);
                         const expenses = expensesByMonth[monthYear];
@@ -5426,7 +5498,8 @@
                         // Total real do mês (variáveis + fixas)
                         const totalMonthWithFixed = totalMonth + fixedMonthTotal;
                         
-                        const isExpanded = state.expandedMonths[monthYear];
+                        // Auto-expandir quando há filtro de data activo
+                        const isExpanded = (state.histDateStart || state.histDateEnd) ? true : state.expandedMonths[monthYear];
                         
                         // Determinar se ficou acima ou abaixo do limite
                         let statusIcon = '';
@@ -5513,7 +5586,28 @@
                                     <span style="display: flex; align-items: center; gap: 15px;">
                                         <span style="display: flex; align-items: center; gap: 8px;">
                                             <span title="${statusTitle}" style="font-size: 0.9rem;">${statusIcon}</span>
-                                            <span>${state.currency || 'AED'} ${totalMonth.toFixed(2)}</span>
+                                            <span>${(() => {
+                                            if (state.histDateStart || state.histDateEnd) {
+                                                const filtTotal = expenses.filter(e => {
+                                                    if (!e.date) return false;
+                                                    const p = e.date.split('/');
+                                                    if (p.length < 3) return false;
+                                                    const eDate = p[2] + '-' + p[1].padStart(2,'0') + '-' + p[0].padStart(2,'0');
+                                                    return (!state.histDateStart || eDate >= state.histDateStart) &&
+                                                           (!state.histDateEnd   || eDate <= state.histDateEnd);
+                                                }).reduce((s, e) => s + (parseFloat(e.amount)||0), 0);
+                                                const filtCount = expenses.filter(e => {
+                                                    if (!e.date) return false;
+                                                    const p = e.date.split('/');
+                                                    if (p.length < 3) return false;
+                                                    const eDate = p[2] + '-' + p[1].padStart(2,'0') + '-' + p[0].padStart(2,'0');
+                                                    return (!state.histDateStart || eDate >= state.histDateStart) &&
+                                                           (!state.histDateEnd   || eDate <= state.histDateEnd);
+                                                }).length;
+                                                return (state.currency || 'AED') + ' ' + filtTotal.toFixed(2) + ' (' + filtCount + ')';
+                                            }
+                                            return (state.currency || 'AED') + ' ' + totalMonth.toFixed(2);
+                                        })()}</span>
                                         </span>
                                         <span class="month-toggle ${isExpanded ? 'expanded' : ''}">▼</span>
                                     </span>
@@ -5590,31 +5684,7 @@
                                         return '';
                                     })()}
                                     
-                                    ${expenses.map(e => {
-                                        const amount = parseFloat(e.amount) || 0;
-                                        const merchant = e.merchant || 'Sem nome';
-                                        const date = e.date || '';
-                                        const time = e.time || '';
-                                        const category = e.category || 'outros';
-                                        const obs = e.obs || '';
-                                        
-                                        return `
-                                        <div class="expense-item">
-                                            <div class="expense-info">
-                                                <div class="expense-merchant">${merchant}</div>
-                                                <div class="expense-date">${date} às ${time}</div>
-                                                ${obs ? `<div class="expense-date" style="font-style: italic; margin-top: 4px;">💬 ${obs}</div>` : ''}
-                                                <span class="expense-category" style="background: ${getCategoryColor(category)}">
-                                                    ${getCategoryIcon(category)} ${getCategoryName(category)}
-                                                </span>
-                                            </div>
-                                            <div style="display:flex; align-items:center;">
-                                                <div class="expense-amount">${state.currency || 'AED'} ${amount.toFixed(2)}</div>
-                                                <button class="edit-btn" onclick="startEditExpense('${e.id}')">✏️</button>
-                                                <button class="delete-btn" onclick="deleteExpense('${e.id}')">🗑️</button>
-                                            </div>
-                                        </div>
-                                    `}).join('')}
+                                    ${renderFilteredExpenses(expenses)}
                                 </div>
                             </div>
                         `;
