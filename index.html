@@ -555,7 +555,6 @@
     // ⚠️ IMPORTANTE: COLE SUA URL DO GOOGLE SHEETS AQUI
     const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbwEswF9iD732EPa1dD6IEhjXR0CpbE2nWVrhVyr_oiyI6S0Fz9yTzvqA3l7-6Wg-Mn0/exec';
 
-
     // Categorias padrão
     const CATEGORIES = [
         { id: 'mercado', name: 'Mercado', icon: '🛒', color: '#10b981' },
@@ -645,7 +644,9 @@
         selectedDashMonth: null,  // Mês selecionado no dashboard (formato MM/YYYY)
         manualEntry: false,  // Controla se está em modo manual ou SMS
         saving: false,  // Lock para evitar duplo envio
-        currency: 'AED'  // Moeda do sistema
+        currency: 'AED',  // Moeda do sistema
+        histPeriodStart: '',  // Filtro período histórico
+        histPeriodEnd: ''     // Filtro período histórico
     };
 
     // Carregar dados do Google Sheets
@@ -5264,11 +5265,136 @@
                 </div>
                 ${state.expenses.length === 0 ? 
                     '<div class="card"><div class="empty">📊<br>Nenhuma despesa ainda</div></div>' :
-                    `<div class="expand-controls">
+                    `<!-- Card de Filtro de Período -->
+                    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 16px; position: relative; overflow: hidden;">
+                        <div style="position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px; background: var(--amber); border-radius: 0 3px 3px 0; opacity: 0.7;"></div>
+                        <div style="font-size: 0.72rem; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px;">📅 Filtrar por Período</div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                            <div>
+                                <label style="font-size: 0.72rem; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 5px;">De</label>
+                                <input type="month" id="histPeriodStart"
+                                    value="${state.histPeriodStart}"
+                                    onchange="state.histPeriodStart = this.value; render();"
+                                    style="width: 100%; padding: 9px 10px; background: var(--surface-2); border: 1px solid var(--border-2); border-radius: var(--radius-sm); color: var(--text-1); font-size: 0.85rem; font-family: inherit; color-scheme: dark;">
+                            </div>
+                            <div>
+                                <label style="font-size: 0.72rem; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 5px;">Até</label>
+                                <input type="month" id="histPeriodEnd"
+                                    value="${state.histPeriodEnd}"
+                                    onchange="state.histPeriodEnd = this.value; render();"
+                                    style="width: 100%; padding: 9px 10px; background: var(--surface-2); border: 1px solid var(--border-2); border-radius: var(--radius-sm); color: var(--text-1); font-size: 0.85rem; font-family: inherit; color-scheme: dark;">
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button onclick="
+                                const now = new Date();
+                                state.histPeriodStart = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+                                state.histPeriodEnd = state.histPeriodStart;
+                                render();" 
+                                style="flex: 1; padding: 7px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-2); font-size: 0.72rem; cursor: pointer; transition: all 0.2s;"
+                                onmouseover="this.style.borderColor='var(--teal)'; this.style.color='var(--teal)';"
+                                onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--text-2)';">Mês Atual</button>
+                            <button onclick="
+                                const now = new Date();
+                                state.histPeriodStart = now.getFullYear() + '-01';
+                                state.histPeriodEnd = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+                                render();"
+                                style="flex: 1; padding: 7px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-2); font-size: 0.72rem; cursor: pointer; transition: all 0.2s;"
+                                onmouseover="this.style.borderColor='var(--teal)'; this.style.color='var(--teal)';"
+                                onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--text-2)';">Ano Atual</button>
+                            <button onclick="
+                                const now = new Date();
+                                const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth()-5, 1);
+                                state.histPeriodStart = sixMonthsAgo.getFullYear() + '-' + String(sixMonthsAgo.getMonth()+1).padStart(2,'0');
+                                state.histPeriodEnd = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+                                render();"
+                                style="flex: 1; padding: 7px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-2); font-size: 0.72rem; cursor: pointer; transition: all 0.2s;"
+                                onmouseover="this.style.borderColor='var(--teal)'; this.style.color='var(--teal)';"
+                                onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--text-2)';">6 Meses</button>
+                            <button onclick="state.histPeriodStart = ''; state.histPeriodEnd = ''; render();"
+                                style="flex: 1; padding: 7px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-2); font-size: 0.72rem; cursor: pointer; transition: all 0.2s;"
+                                onmouseover="this.style.borderColor='#ef4444'; this.style.color='#ef4444';"
+                                onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--text-2)';">Limpar</button>
+                        </div>
+                    </div>
+
+                    <!-- Resumo do Período (só aparece quando há filtro activo) -->
+                    ${(() => {
+                        if (!state.histPeriodStart && !state.histPeriodEnd) return '';
+
+                        const filteredMonths = months.filter(monthYear => {
+                            const [m, y] = monthYear.split('/').map(Number);
+                            const monthDate = y + '-' + String(m).padStart(2,'0');
+                            const afterStart = !state.histPeriodStart || monthDate >= state.histPeriodStart;
+                            const beforeEnd  = !state.histPeriodEnd   || monthDate <= state.histPeriodEnd;
+                            return afterStart && beforeEnd;
+                        });
+
+                        if (filteredMonths.length === 0) return '<div style="text-align:center; padding: 20px; color: var(--text-3); font-size: 0.9rem;">Nenhuma despesa neste período</div>';
+
+                        const periodVariavel = filteredMonths.reduce((sum, m) => sum + (expensesByMonth[m] || []).reduce((s, e) => s + (parseFloat(e.amount)||0), 0), 0);
+                        const periodFixo = filteredMonths.reduce((sum, m) => sum + (state.monthlyFixedExpenses[m] || []).reduce((s, f) => s + (parseFloat(f.amount)||0), 0), 0);
+                        const periodTotal = periodVariavel + periodFixo;
+                        const periodIncome = filteredMonths.reduce((sum, m) => {
+                            const [mo, ye] = m.split('/').map(Number);
+                            const key = mo + '/' + ye;
+                            return sum + (state.monthlyIncome[key] || state.monthlyIncome[m] || 0);
+                        }, 0);
+                        const periodEconomy = periodIncome - periodTotal;
+                        const numMonths = filteredMonths.length;
+                        const cur = state.currency || 'AED';
+
+                        return \`<div style="background: var(--surface); border: 1px solid rgba(0,212,170,0.2); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 16px; border-left: 3px solid var(--teal);">
+                            <div style="font-size: 0.72rem; color: var(--teal); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 14px;">
+                                📊 Resumo — \${numMonths} \${numMonths === 1 ? 'mês' : 'meses'} seleccionados
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                                <div style="background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px;">
+                                    <div style="font-size: 0.7rem; color: var(--text-2); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em;">💸 Variáveis</div>
+                                    <div style="font-size: 1.1rem; font-weight: 700; color: #ef4444; font-variant-numeric: tabular-nums;">\${formatAED(periodVariavel)}</div>
+                                    <div style="font-size: 0.7rem; color: var(--text-3); margin-top: 2px;">Média \${formatAED(periodVariavel/numMonths)}/mês</div>
+                                </div>
+                                <div style="background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px;">
+                                    <div style="font-size: 0.7rem; color: var(--text-2); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em;">🔒 Fixas</div>
+                                    <div style="font-size: 1.1rem; font-weight: 700; color: #f59e0b; font-variant-numeric: tabular-nums;">\${formatAED(periodFixo)}</div>
+                                    <div style="font-size: 0.7rem; color: var(--text-3); margin-top: 2px;">Média \${formatAED(periodFixo/numMonths)}/mês</div>
+                                </div>
+                                <div style="background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px;">
+                                    <div style="font-size: 0.7rem; color: var(--text-2); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em;">📦 Total Gasto</div>
+                                    <div style="font-size: 1.1rem; font-weight: 700; color: var(--text-1); font-variant-numeric: tabular-nums;">\${formatAED(periodTotal)}</div>
+                                    <div style="font-size: 0.7rem; color: var(--text-3); margin-top: 2px;">Média \${formatAED(periodTotal/numMonths)}/mês</div>
+                                </div>
+                                <div style="background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px;">
+                                    <div style="font-size: 0.7rem; color: var(--text-2); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em;">💰 Rendimento</div>
+                                    <div style="font-size: 1.1rem; font-weight: 700; color: #22c55e; font-variant-numeric: tabular-nums;">\${periodIncome > 0 ? formatAED(periodIncome) : '—'}</div>
+                                    <div style="font-size: 0.7rem; color: var(--text-3); margin-top: 2px;">\${periodIncome > 0 ? 'Média ' + formatAED(periodIncome/numMonths) + '/mês' : 'Sem dados'}</div>
+                                </div>
+                            </div>
+                            \${periodIncome > 0 ? \`
+                            <div style="padding: 12px; background: \${periodEconomy >= 0 ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)'}; border: 1px solid \${periodEconomy >= 0 ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}; border-radius: var(--radius-sm); display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <div style="font-size: 0.72rem; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.05em;">\${periodEconomy >= 0 ? '🎉 Total Economizado' : '🚨 Total Déficit'}</div>
+                                    <div style="font-size: 0.72rem; color: var(--text-3); margin-top: 2px;">Média \${formatAED(Math.abs(periodEconomy)/numMonths)}/mês</div>
+                                </div>
+                                <div style="font-size: 1.3rem; font-weight: 700; color: \${periodEconomy >= 0 ? '#22c55e' : '#ef4444'}; font-variant-numeric: tabular-nums;">
+                                    \${periodEconomy >= 0 ? '+' : ''}\${formatAED(periodEconomy)}
+                                </div>
+                            </div>\` : ''}
+                        </div>\`;
+                    })()}
+
+                    <div class="expand-controls">
                         <button onclick="expandAllMonths()">📂 Expandir Todos</button>
                         <button onclick="collapseAllMonths()">📁 Colapsar Todos</button>
                     </div>` +
-                    months.map(monthYear => {
+                    months.filter(monthYear => {
+                        if (!state.histPeriodStart && !state.histPeriodEnd) return true;
+                        const [m, y] = monthYear.split('/').map(Number);
+                        const monthDate = y + '-' + String(m).padStart(2,'0');
+                        const afterStart = !state.histPeriodStart || monthDate >= state.histPeriodStart;
+                        const beforeEnd  = !state.histPeriodEnd   || monthDate <= state.histPeriodEnd;
+                        return afterStart && beforeEnd;
+                    }).map(monthYear => {
                         const [month, year] = monthYear.split('/').map(Number);
                         const expenses = expensesByMonth[monthYear];
                         const totalMonth = expenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
