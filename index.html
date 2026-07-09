@@ -458,7 +458,49 @@
     .gauge-info-value { font-size: 1rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 
     /* ── LOADING ──────────────────────────── */
-    .loading { text-align: center; padding: 60px; font-size: 1rem; color: var(--text-2); letter-spacing: 0.05em; }
+    .loading {
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        background: var(--bg); z-index: 9998; gap: 28px;
+    }
+    .loading-logo {
+        font-size: 3rem; animation: loadingPulse 1.5s ease-in-out infinite;
+    }
+    .loading-spinner {
+        width: 48px; height: 48px;
+        border: 3px solid rgba(0,212,170,0.15);
+        border-top: 3px solid #00D4AA;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+    .loading-text {
+        font-size: 0.8rem; color: var(--text-3); letter-spacing: 0.12em;
+        text-transform: uppercase; animation: loadingFade 1.5s ease-in-out infinite;
+    }
+    .loading-bars {
+        display: flex; gap: 5px; align-items: flex-end; height: 24px;
+    }
+    .loading-bar {
+        width: 4px; background: #00D4AA; border-radius: 2px;
+        animation: loadingBar 1s ease-in-out infinite;
+    }
+    .loading-bar:nth-child(1) { animation-delay: 0s;    height: 8px; }
+    .loading-bar:nth-child(2) { animation-delay: 0.15s; height: 16px; }
+    .loading-bar:nth-child(3) { animation-delay: 0.3s;  height: 24px; }
+    .loading-bar:nth-child(4) { animation-delay: 0.15s; height: 16px; }
+    .loading-bar:nth-child(5) { animation-delay: 0s;    height: 8px; }
+    @keyframes loadingBar {
+        0%, 100% { opacity: 0.3; transform: scaleY(0.6); }
+        50%       { opacity: 1;   transform: scaleY(1); }
+    }
+    @keyframes loadingPulse {
+        0%, 100% { transform: scale(1);    opacity: 0.8; }
+        50%       { transform: scale(1.12); opacity: 1; }
+    }
+    @keyframes loadingFade {
+        0%, 100% { opacity: 0.4; }
+        50%       { opacity: 0.9; }
+    }
 
     /* ── CATEGORY LIST ────────────────────── */
     .category-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
@@ -523,9 +565,21 @@
 
 </head>
 <body>
+    <!-- Inline loading overlay — shown immediately, removed by render() -->
+    <div id="loadingOverlay" class="loading">
+        <div class="loading-logo">💰</div>
+        <div class="loading-bars">
+            <div class="loading-bar"></div>
+            <div class="loading-bar"></div>
+            <div class="loading-bar"></div>
+            <div class="loading-bar"></div>
+            <div class="loading-bar"></div>
+        </div>
+        <div class="loading-text">Loading...</div>
+    </div>
     <div class="container">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h1 style="margin: 0;">💰 Minhas Despesas</h1>
+            <h1 id="appTitle" style="margin: 0; opacity: 0; transition: opacity 0.15s ease;">💰 Minhas Despesas</h1>
             <div style="display: flex; gap: 8px; align-items: center;">
                 <button onclick="openSettings()" title="Configurações" style="
                     background: rgba(255,255,255,0.04);
@@ -571,23 +625,377 @@
     });
 
     // ⚠️ IMPORTANTE: COLE SUA URL DO GOOGLE SHEETS AQUI
-   const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbwEswF9iD732EPa1dD6IEhjXR0CpbE2nWVrhVyr_oiyI6S0Fz9yTzvqA3l7-6Wg-Mn0/exec';
+    const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbwEswF9iD732EPa1dD6IEhjXR0CpbE2nWVrhVyr_oiyI6S0Fz9yTzvqA3l7-6Wg-Mn0/exec';
 
     // Categorias padrão
-    const CATEGORIES = [
-        { id: 'mercado', name: 'Mercado', icon: '🛒', color: '#10b981' },
-        { id: 'restaurante', name: 'Restaurante', icon: '🍽️', color: '#f59e0b' },
-        { id: 'transporte', name: 'Transporte', icon: '🚗', color: '#3b82f6' },
-        { id: 'lazer', name: 'Lazer', icon: '🎮', color: '#8b5cf6' },
-        { id: 'saude', name: 'Saúde', icon: '💊', color: '#ef4444' },
-        { id: 'educacao', name: 'Educação', icon: '📚', color: '#0ea5e9' },
-        { id: 'moradia', name: 'Moradia', icon: '🏠', color: '#6366f1' },
-        { id: 'viagem', name: 'Viagem', icon: '✈️', color: '#14b8a6' },
-        { id: 'compras', name: 'Compras', icon: '🛍️', color: '#ec4899' },
-        { id: 'outros', name: 'Outros', icon: '📦', color: '#6b7280' }
-    ];
+    // CATEGORIES é uma função para suportar tradução dinâmica
+    function getCategories() {
+        return [
+            { id: 'mercado',    name: t('mercado'),    icon: '🛒', color: '#10b981' },
+            { id: 'restaurante',name: t('restaurante'),icon: '🍽️', color: '#f59e0b' },
+            { id: 'transporte', name: t('transporte'), icon: '🚗', color: '#3b82f6' },
+            { id: 'lazer',      name: t('lazer'),      icon: '🎮', color: '#8b5cf6' },
+            { id: 'saude',      name: t('saude'),      icon: '💊', color: '#ef4444' },
+            { id: 'educacao',   name: t('educacao'),   icon: '📚', color: '#0ea5e9' },
+            { id: 'moradia',    name: t('moradia'),    icon: '🏠', color: '#6366f1' },
+            { id: 'viagem',     name: t('viagem'),     icon: '✈️', color: '#14b8a6' },
+            { id: 'compras',    name: t('compras'),    icon: '🛍️', color: '#ec4899' },
+            { id: 'outros',     name: t('outros'),     icon: '📦', color: '#6b7280' },
+        ];
+    }
+    // Alias para compatibilidade com código existente
+    Object.defineProperty(window, 'CATEGORIES', { get: getCategories });
 
     // Função para formatar valores em AED com centavos
+    // ============================================
+    // INTERNACIONALIZAÇÃO (i18n)
+    // ============================================
+    const I18N = {
+        pt: {
+            // Tabs
+            dashboard: 'Dashboard', variavel: 'Variável', fixas: 'Fixas',
+            categorias: 'Categorias', historico: 'Histórico',
+            // Header
+            appTitle: 'Minhas Despesas',
+            // Dashboard
+            saldoMes: 'Gasto este mês', limiteMensal: 'Limite Mensal',
+            gastoHoje: 'Gasto hoje', limiteHoje: 'Limite hoje',
+            disponivelHoje: 'Disponível hoje', gastoAtual: 'Gasto atual',
+            poderiaGastar: 'Poderia gastar', diferenca: 'Diferença',
+            economiaAnual: 'Economia Anual', metaAnual: 'Meta Anual',
+            economizado: 'Economizado', faltam: 'Faltam', superouEm: 'Superou em',
+            mediaMensal: 'Média Mensal', acima: 'acima', abaixo: 'abaixo',
+            disponivelMes: 'Disponível no mês', gastasFixas: 'Gastas (Fixas)',
+            gastasVariaveis: 'Gastas (Variáveis)',
+            // Variável tab
+            inserirViaSMS: 'Inserção via SMS', inserirManual: 'Inserção Manual',
+            colarSMS: '📋 Colar SMS', extrairAdicionar: 'Extrair e Adicionar',
+            adicionarManualmente: 'Adicionar Manualmente', salvando: 'Salvando...',
+            estabelecimento: 'Estabelecimento', valor: 'Valor', data: 'Data',
+            hora: 'Hora', observacao: 'Observação (opcional)',
+            selecioneCategoria: 'Selecione uma Categoria',
+            rendimentoMensal: '💰 Rendimento Mensal', gerirTodos: '📋 Gerir Todos',
+            salvar: '💾 Salvar',
+            // Fixas tab
+            despesasFixas: 'Despesas Fixas', adicionarFixa: 'Adicionar Nova Despesa Fixa',
+            nome: 'Nome', diaVencimento: 'Dia Vencimento', editar: 'Editar',
+            selecioneMes: '📅 Selecione o Mês:', novaFixa: 'Nova', editarFixa: 'Editar',
+            nomeDaDespesa: 'Nome da despesa', diaMes: 'Dia do mês', categoriaLabel: 'Categoria',
+            nenhumaFixaCadastrada: 'Nenhuma despesa fixa cadastrada neste mês',
+            totalDespesasFixas: 'Total de Despesas Fixas', fixasListTitle: 'Despesas Fixas',
+            despesaFixaTitulo: 'Despesa Fixa', mesesComDespesas: 'meses com despesas',
+            mesComDespesas: 'mês com despesas', topCategorias: 'Top 6 categorias',
+            gerarRelatorio: 'Gere um relatório completo com todos os rendimentos, despesas fixas, despesas variáveis e balanço do ano.',
+            dicaRelatorio: 'O relatório incluirá todas as despesas fixas e variáveis do ano selecionado, organizadas por mês e categoria.',
+            despesasCount: 'despesas', despesaCount: 'despesa',
+            cancelar: 'Cancelar', salvarFixa: 'Salvar', adicionarFixaBtn: '➕ Adicionar Despesa Fixa',
+            copiarMesAnterior: '📋 Copiar do Mês Anterior', nomeFixa: 'Nome da despesa fixa',
+            // Categorias tab
+            todasCategorias: 'Todas', semDespesas: 'Sem despesas neste período',
+            // Histórico tab
+            filtrarPeriodo: '📅 Filtrar por Período', de: 'De', ate: 'Até',
+            hoje: 'Hoje', semana: 'Semana', mes: 'Mês', ano: 'Ano', limpar: 'Limpar',
+            expandirTodos: '📂 Expandir Todos', colapsarTodos: '📁 Colapsar Todos',
+            resumo: '📊 Resumo', dias: 'dias', dia: 'dia', meses: 'meses',
+            despesas: 'despesas', totalVariaveis: '💸 Total Variáveis',
+            media: 'Média', porDia: '/dia', porMes: '/mês',
+            nenhumaDespesa: 'Nenhuma despesa neste período',
+            nenhumaDespesaAinda: 'Nenhuma despesa ainda',
+            // Settings
+            configuracoes: '⚙️ Configurações', limitesMensais: 'Limites Mensais',
+            despesasVariaveis: '💸 Despesas Variáveis', despesasFixasLabel: '💳 Despesas Fixas',
+            metaEconomiaAnual: '🎯 Meta de Economia Anual',
+            mercadoRestaurante: 'Mercado, restaurante, transporte, etc.',
+            aluguelContas: 'Aluguel, contas, assinaturas, etc.',
+            quantoEconomizar: 'Quanto deseja economizar este ano?',
+            limiteTotalMensal: '🗓️ Limite Total Mensal', moeda: 'Moeda',
+            moedaSistema: '💱 Moeda do Sistema', afetaTodos: 'Afeta todos os valores exibidos no app',
+            idioma: 'Idioma', idiomaLabel: '🌐 Idioma do Sistema',
+            dados: 'Dados', downloadBackup: '💾 Download Backup (XLSX)',
+            // Toasts & alerts
+            despesaSalva: '✅ Despesa salva no Google Sheets!',
+            erroSalvar: '❌ Erro ao salvar. Tente novamente.',
+            despesaAtualizada: '✅ Despesa atualizada com sucesso!',
+            erroAtualizar: '❌ Erro ao atualizar. Tente novamente.',
+            erroDeletar: '❌ Erro ao deletar. Tente novamente.',
+            confirmarExcluir: 'Excluir esta despesa?',
+            erroExtract: '❌ Não consegui extrair os dados. Verifique o formato do SMS.',
+            erroCategoria: '❌ Por favor, selecione uma categoria para a despesa.',
+            erroCampos: '⚠️ Preencha todos os campos obrigatórios',
+            erroSelecionarCategoria: '⚠️ Selecione uma categoria',
+            rendimentoNegativo: '⚠️ O rendimento não pode ser negativo',
+            rendimentoSalvo: '✅ Rendimento de',
+            rendimentoSalvoSufixo: 'salvo com sucesso!',
+            moedaAlterada: '✅ Moeda alterada para',
+            idiomaAlterado: '✅ Idioma alterado para',
+            backupPreparando: '⏳ Preparando backup...',
+            backupBaixado: '✅ Backup baixado:',
+            erroPDF: '❌ Erro ao carregar gerador de PDF',
+            // Month names
+            monthNames: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
+            monthNamesFull: ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'],
+            // Category names
+            mercado: 'Mercado', restaurante: 'Restaurante', transporte: 'Transporte',
+            saude: 'Saúde', educacao: 'Educação', lazer: 'Lazer',
+            vestuario: 'Vestuário', outros: 'Outros', moradia: 'Moradia',
+            viagem: 'Viagem', compras: 'Compras', beleza: 'Beleza', tecnologia: 'Tecnologia',
+            // Ritmo
+            excelente: 'Excelente', bom: 'Bom', atencao: 'Atenção',
+            cuidado: 'Cuidado', critico: 'Crítico',
+            // Income manager
+            gerirRendimentos: '💰 Manage Income',
+            futurosMeses: '↑ future · current month centred · past ↓',
+            atual: 'ATUAL', futuro: 'futuro', rendimentoPlaceholder: 'Rendimento...',
+            mesesFuturos: '6 meses futuros · mês actual · 12 meses passados',
+            // Dashboard
+            termometro: '🌡️ Termômetro de Gastos do Mês',
+            limiteMensalLabel: 'Limite Mensal', limiteDiario: 'Limite Diário',
+            restante: 'Restante', disponivelLabel: 'Disponível', acima: 'Acima',
+            gastoAtualLabel: 'Gasto atual', poderiaGastarLabel: 'Poderia gastar',
+            diferencaLabel: 'Diferença', totalMes: '💰 Total do Mês',
+            fixasVariaveis: 'Fixas + Variáveis', totalGeral: '💰 Total Geral',
+            despesasFixasCard: '💳 Despesas Fixas', despesasVariaveisCard: '💸 Variáveis',
+            doLimite: 'DO LIMITE', deHoje: 'DE HOJE',
+            diasPassados: 'dias passados', diasRestantes: 'dias restantes',
+            diaPassado: 'dia passado', diaRestante: 'dia restante',
+            carregando: '⏳ Carregando dados...',
+            totalDaCategoria: 'Total da Categoria', menorLabel: 'Menor',
+            estabelecimentosLabel: '🏪 Estabelecimentos', vezLabel: 'vez', vezesLabel: 'vezes',
+            doTotalLabel: 'do total', abaixoLimite: 'Abaixo do limite', noLimite: 'No limite', acimaLimite: 'Acima do limite',
+            guardouTooltip: 'Guardou', deficitTooltip: 'Déficit',
+            doRendimento: 'do rendimento', gastaExactamente: 'Gastou exactamente 100% do rendimento',
+            as: 'às', rendimentoLabel: '💰 Rendimento',
+            fixasLabel2: '🔒 Fixas', totalDespesasLabel: '📊 Total Despesas',
+            economiaLabel: 'Economia', guardouRendimento: 'Você guardou',
+            doSeuRendimento: 'do seu rendimento!', aMaisQueRendimento: 'a mais que o rendimento',
+            atual: 'Atual', despesasVariaveisCat: '💸 Despesas Variáveis por Categoria',
+            gastosPorCat: '📊 Gastos por Categoria', distribuicaoCat: '🍕 Distribuição por Categoria',
+            totalGeralVariaveis: 'Total Geral de Despesas Variáveis',
+            transacoesEm: 'transações em', estabelecimentos: 'estabelecimentos', transacoesLabel: 'transações',
+            ritmoIdeal: 'Você está no ritmo ideal!',
+            ritmoBemMenos: 'Você está gastando BEM MENOS que poderia!',
+            ritmoLevemente: 'Levemente acima do esperado',
+            ritmoMais: 'Você está gastando mais que poderia',
+            ritmoMuito: 'Gastos MUITO acima do esperado!',
+            poderiaGastarLabel: 'Poderia Gastar',
+            progressoMes: 'Progresso do Mês',
+            visualizarMes: '📅 Visualizar Mês:',
+            usado: 'usado', transacoes: 'Transações',
+            mediaLabel: 'Média', maiorLabel: 'Maior',
+            resumoMes: '📊 Resumo do Mês',
+            despesasVariaveisCard2: '💸 Despesas Variáveis',
+            transacoesMes: 'transações este mês',
+            transacaoMes: 'transação este mês',
+            doLimiteTotal: 'do limite total',
+            comparacaoLimites: '📊 Comparação com Limites',
+            variaveis: '💸 Variáveis', fixasLabel: '💳 Fixas',
+            relatorioAnual: '📄 Relatório Anual em PDF',
+            selecioneAno: '📅 Selecione o Ano:',
+            gerarRelatorio2: '📥 Gerar Relatório PDF',
+            dica: '💡 Dica:', evolucaoDespesas: '📈 Evolução de Despesas',
+            mediaLabel2: 'Média', mediaMensalLabel: 'Média Mensal',
+            limiteLabel: 'Limite', gastoLabel: 'Gasto',
+            ritmoLabel: 'Ritmo', smsPlaceholder: 'Cole aqui o SMS...',
+            coleSMS: 'COLE O SMS DO BANCO:', colar: 'Colar',
+            manual: 'Manual', observacaoPlaceholder: 'Ex: Presente, Dividido com amigos...',
+            topCatMeses: 'meses com despesas', topCatMes: 'mês com despesas',
+            // Variavel
+            coleOSMS: 'COLE O SMS DO BANCO:', observacaoLabel: 'OBSERVAÇÃO (OPCIONAL):',
+            selecioneCatLabel: 'SELECIONE A CATEGORIA:',
+            exPlaceholder: 'Ex: Presente, Dividido com amigos...',
+            colado: '✅ Pasted!', erroPermissao: '❌ Error',
+            erroClipboard: '⚠️ Não foi possível acessar a área de transferência.\n\nPor favor, cole manualmente usando Ctrl+V (ou Command+V).',
+            // Fixas
+            copiarMesAnteriorBtn: '📋 Copiar do Mês Anterior',
+            adicionarFixaMonthly: '➕ Add Fixed Expense',
+            erroMesAnterior: '❌ Mês anterior não possui despesas fixas cadastradas.',
+            erroJaPossui: '❌ Este mês já possui despesas fixas cadastradas. Delete-as primeiro se quiser copiar do mês anterior.',
+            confirmarCopiar: 'Tem certeza que deseja copiar as despesas fixas de',
+            para: 'para',
+            fixaCopiada: '✅ Despesas fixas copiadas com sucesso!',
+            erroCopiar: '❌ Erro ao copiar despesas fixas.',
+            fixaAdicionada: '✅ Despesa fixa adicionada!',
+            fixaAtualizada: '✅ Despesa fixa atualizada com sucesso!',
+            fixaExcluida: '✅ Despesa fixa excluída com sucesso!',
+            confirmarExcluirFixa: 'Tem certeza que deseja excluir esta despesa fixa deste mês?',
+            erroPreencha: 'Por favor, preencha todos os campos!',
+            erroJaExiste: '⚠️ Esta despesa fixa já existe neste mês!',
+            erroExcluirFixa: '❌ Erro ao excluir despesa fixa. Tente novamente.',
+            erroAtualizarFixa: '❌ Erro ao atualizar despesa fixa. Tente novamente.',
+            // History
+            ate: 'Até',
+            semanaLabel: 'Esta Semana', mesLabel: 'Este Mês', anoLabel: 'Este Ano',
+        },
+        en: {
+            dashboard: 'Dashboard', variavel: 'Variable', fixas: 'Fixed',
+            categorias: 'Categories', historico: 'History',
+            appTitle: 'My Expenses',
+            saldoMes: 'Spent this month', limiteMensal: 'Monthly Limit',
+            gastoHoje: 'Spent today', limiteHoje: "Today's limit",
+            disponivelHoje: 'Available today', gastoAtual: 'Current spend',
+            poderiaGastar: 'Should have spent', diferenca: 'Difference',
+            economiaAnual: 'Annual Savings', metaAnual: 'Annual Goal',
+            economizado: 'Saved', faltam: 'Remaining', superouEm: 'Exceeded by',
+            mediaMensal: 'Monthly Average', acima: 'above', abaixo: 'below',
+            disponivelMes: 'Available this month', gastasFixas: 'Spent (Fixed)',
+            gastasVariaveis: 'Spent (Variable)',
+            inserirViaSMS: 'Add via SMS', inserirManual: 'Manual Entry',
+            colarSMS: '📋 Paste SMS', extrairAdicionar: 'Extract & Add',
+            adicionarManualmente: 'Add Manually', salvando: 'Saving...',
+            estabelecimento: 'Merchant', valor: 'Amount', data: 'Date',
+            hora: 'Time', observacao: 'Notes (optional)',
+            selecioneCategoria: 'Select a Category',
+            rendimentoMensal: '💰 Monthly Income', gerirTodos: '📋 Manage All',
+            salvar: '💾 Save',
+            despesasFixas: 'Fixed Expenses', adicionarFixa: 'Add New Fixed Expense',
+            nome: 'Name', diaVencimento: 'Due Day', editar: 'Edit',
+            selecioneMes: '📅 Select Month:', novaFixa: 'New', editarFixa: 'Edit',
+            nomeDaDespesa: 'Expense name', diaMes: 'Day of month', categoriaLabel: 'Category',
+            nenhumaFixaCadastrada: 'No fixed expenses for this month',
+            totalDespesasFixas: 'Total Fixed Expenses', fixasListTitle: 'Fixed Expenses',
+            despesaFixaTitulo: 'Fixed Expense', mesesComDespesas: 'months with expenses',
+            mesComDespesas: 'month with expenses', topCategorias: 'Top 6 categories',
+            gerarRelatorio: 'Generate a complete report with all income, fixed expenses, variable expenses and annual balance.',
+            dicaRelatorio: 'The report will include all fixed and variable expenses for the selected year, organised by month and category.',
+            despesasCount: 'expenses', despesaCount: 'expense',
+            cancelar: 'Cancel', salvarFixa: 'Save', adicionarFixaBtn: '➕ Add Fixed Expense',
+            copiarMesAnterior: '📋 Copy from Previous Month', nomeFixa: 'Fixed expense name',
+            todasCategorias: 'All', semDespesas: 'No expenses in this period',
+            filtrarPeriodo: '📅 Filter by Period', de: 'From', ate: 'To',
+            hoje: 'Today', semana: 'Week', mes: 'Month', ano: 'Year', limpar: 'Clear',
+            expandirTodos: '📂 Expand All', colapsarTodos: '📁 Collapse All',
+            resumo: '📊 Summary', dias: 'days', dia: 'day', meses: 'months',
+            despesas: 'expenses', totalVariaveis: '💸 Total Variable',
+            media: 'Avg', porDia: '/day', porMes: '/month',
+            nenhumaDespesa: 'No expenses in this period',
+            nenhumaDespesaAinda: 'No expenses yet',
+            configuracoes: '⚙️ Settings', limitesMensais: 'Monthly Limits',
+            despesasVariaveis: '💸 Variable Expenses', despesasFixasLabel: '💳 Fixed Expenses',
+            metaEconomiaAnual: '🎯 Annual Savings Goal',
+            mercadoRestaurante: 'Groceries, restaurants, transport, etc.',
+            aluguelContas: 'Rent, bills, subscriptions, etc.',
+            quantoEconomizar: 'How much do you want to save this year?',
+            limiteTotalMensal: '🗓️ Total Monthly Limit', moeda: 'Currency',
+            moedaSistema: '💱 System Currency', afetaTodos: 'Affects all values shown in the app',
+            idioma: 'Language', idiomaLabel: '🌐 System Language',
+            dados: 'Data', downloadBackup: '💾 Download Backup (XLSX)',
+            despesaSalva: '✅ Expense saved!',
+            erroSalvar: '❌ Error saving. Please try again.',
+            despesaAtualizada: '✅ Expense updated successfully!',
+            erroAtualizar: '❌ Error updating. Please try again.',
+            erroDeletar: '❌ Error deleting. Please try again.',
+            confirmarExcluir: 'Delete this expense?',
+            erroExtract: '❌ Could not extract data. Please check the SMS format.',
+            erroCategoria: '❌ Please select a category for the expense.',
+            erroCampos: '⚠️ Please fill in all required fields',
+            erroSelecionarCategoria: '⚠️ Please select a category',
+            rendimentoNegativo: '⚠️ Income cannot be negative',
+            rendimentoSalvo: '✅ Income of',
+            rendimentoSalvoSufixo: 'saved successfully!',
+            moedaAlterada: '✅ Currency changed to',
+            idiomaAlterado: '✅ Language changed to',
+            backupPreparando: '⏳ Preparing backup...',
+            backupBaixado: '✅ Backup downloaded:',
+            erroPDF: '❌ Error loading PDF generator',
+            monthNames: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+            monthNamesFull: ['January','February','March','April','May','June','July','August','September','October','November','December'],
+            mercado: 'Groceries', restaurante: 'Restaurant', transporte: 'Transport',
+            saude: 'Health', educacao: 'Education', lazer: 'Leisure',
+            vestuario: 'Clothing', outros: 'Others', moradia: 'Housing',
+            viagem: 'Travel', compras: 'Shopping', beleza: 'Beauty', tecnologia: 'Technology',
+            excelente: 'Excellent', bom: 'Good', atencao: 'Attention',
+            cuidado: 'Caution', critico: 'Critical',
+            gerirRendimentos: '💰 Manage Income',
+            futurosMeses: '↑ future · current month centred · past ↓',
+            atual: 'CURRENT', futuro: 'future', rendimentoPlaceholder: 'Income...',
+            mesesFuturos: '6 future months · current month · 12 past months',
+            // Dashboard
+            termometro: '🌡️ Monthly Spending Thermometer',
+            limiteMensalLabel: 'Monthly Limit', limiteDiario: 'Daily Limit',
+            restante: 'Remaining', disponivelLabel: 'Available', acima: 'Over',
+            gastoAtualLabel: 'Current spend', poderiaGastarLabel: 'Should have spent',
+            diferencaLabel: 'Difference', totalMes: '💰 Monthly Total',
+            fixasVariaveis: 'Fixed + Variable', totalGeral: '💰 Grand Total',
+            despesasFixasCard: '💳 Fixed Expenses', despesasVariaveisCard: '💸 Variable',
+            doLimite: 'OF LIMIT', deHoje: 'OF TODAY',
+            diasPassados: 'days elapsed', diasRestantes: 'days remaining',
+            diaPassado: 'day elapsed', diaRestante: 'day remaining',
+            carregando: '⏳ Loading data...',
+            totalDaCategoria: 'Category Total', menorLabel: 'Lowest',
+            estabelecimentosLabel: '🏪 Merchants', vezLabel: 'time', vezesLabel: 'times',
+            doTotalLabel: 'of total', abaixoLimite: 'Below limit', noLimite: 'At limit', acimaLimite: 'Above limit',
+            guardouTooltip: 'Saved', deficitTooltip: 'Deficit',
+            doRendimento: 'of income', gastaExactamente: 'Spent exactly 100% of income',
+            as: 'at', rendimentoLabel: '💰 Income',
+            fixasLabel2: '🔒 Fixed', totalDespesasLabel: '📊 Total Expenses',
+            economiaLabel: 'Savings', guardouRendimento: 'You saved',
+            doSeuRendimento: 'of your income!', aMaisQueRendimento: 'over your income',
+            atual: 'Current', despesasVariaveisCat: '💸 Variable Expenses by Category',
+            gastosPorCat: '📊 Spending by Category', distribuicaoCat: '🍕 Distribution by Category',
+            totalGeralVariaveis: 'Total Variable Expenses',
+            transacoesEm: 'transactions in', estabelecimentos: 'merchants', transacoesLabel: 'transactions',
+            ritmoIdeal: 'You are on track!',
+            ritmoBemMenos: 'You are spending MUCH LESS than expected!',
+            ritmoLevemente: 'Slightly above expected',
+            ritmoMais: 'You are spending more than expected',
+            ritmoMuito: 'Spending MUCH more than expected!',
+            poderiaGastarLabel: 'Should Spend',
+            progressoMes: 'Month Progress',
+            visualizarMes: '📅 View Month:',
+            usado: 'used', transacoes: 'Transactions',
+            mediaLabel: 'Average', maiorLabel: 'Highest',
+            resumoMes: '📊 Month Summary',
+            despesasVariaveisCard2: '💸 Variable Expenses',
+            transacoesMes: 'transactions this month',
+            transacaoMes: 'transaction this month',
+            doLimiteTotal: 'of total limit',
+            comparacaoLimites: '📊 Limit Comparison',
+            variaveis: '💸 Variable', fixasLabel: '💳 Fixed',
+            relatorioAnual: '📄 Annual PDF Report',
+            selecioneAno: '📅 Select Year:',
+            gerarRelatorio2: '📥 Generate PDF Report',
+            dica: '💡 Tip:', evolucaoDespesas: '📈 Expense Evolution',
+            mediaLabel2: 'Average', mediaMensalLabel: 'Monthly Average',
+            limiteLabel: 'Limit', gastoLabel: 'Spent',
+            ritmoLabel: 'Pace', smsPlaceholder: 'Paste SMS here...',
+            coleSMS: 'PASTE BANK SMS:', colar: 'Paste',
+            manual: 'Manual', observacaoPlaceholder: 'Ex: Gift, Split with friends...',
+            topCatMeses: 'months with expenses', topCatMes: 'month with expenses',
+            // Variable
+            coleOSMS: 'PASTE BANK SMS:', observacaoLabel: 'NOTES (OPTIONAL):',
+            selecioneCatLabel: 'SELECT A CATEGORY:',
+            exPlaceholder: 'Ex: Gift, Split with friends...',
+            colado: '✅ Pasted!', erroPermissao: '❌ Error',
+            erroClipboard: '⚠️ Could not access clipboard.\n\nPlease paste manually using Ctrl+V (or Command+V).',
+            // Fixed
+            copiarMesAnteriorBtn: '📋 Copy from Previous Month',
+            adicionarFixaMonthly: '➕ Add Fixed Expense',
+            erroMesAnterior: '❌ Previous month has no fixed expenses.',
+            erroJaPossui: '❌ This month already has fixed expenses. Delete them first if you want to copy from the previous month.',
+            confirmarCopiar: 'Are you sure you want to copy fixed expenses from',
+            para: 'to',
+            fixaCopiada: '✅ Fixed expenses copied successfully!',
+            erroCopiar: '❌ Error copying fixed expenses.',
+            fixaAdicionada: '✅ Fixed expense added!',
+            fixaAtualizada: '✅ Fixed expense updated successfully!',
+            fixaExcluida: '✅ Fixed expense deleted successfully!',
+            confirmarExcluirFixa: 'Are you sure you want to delete this fixed expense for this month?',
+            erroPreencha: 'Please fill in all fields!',
+            erroJaExiste: '⚠️ This fixed expense already exists for this month!',
+            erroExcluirFixa: '❌ Error deleting fixed expense. Please try again.',
+            erroAtualizarFixa: '❌ Error updating fixed expense. Please try again.',
+            // History
+            ate: 'To',
+            semanaLabel: 'This Week', mesLabel: 'This Month', anoLabel: 'This Year',
+        }
+    };
+
+    // Função de tradução
+    function t(key) {
+        const lang = (typeof state !== 'undefined' && state && state.lang) ? state.lang : 'pt';
+        return (I18N[lang] && I18N[lang][key]) || I18N['pt'][key] || key;
+    }
+
     // Locales recomendados por moeda
     const CURRENCY_LOCALES = { AED: 'en-AE', BRL: 'pt-BR', USD: 'en-US', EUR: 'de-DE', GBP: 'en-GB', CHF: 'de-CH', CAD: 'en-CA', AUD: 'en-AU', JPY: 'ja-JP', CNY: 'zh-CN' };
 
@@ -664,7 +1072,8 @@
         saving: false,  // Lock para evitar duplo envio
         currency: 'AED',  // Moeda do sistema
         histDateStart: '',  // Filtro data início histórico
-        histDateEnd: ''     // Filtro data fim histórico
+        histDateEnd: '',    // Filtro data fim histórico
+        lang: 'pt'          // Idioma: 'pt' ou 'en'
     };
 
     // Carregar dados do Google Sheets
@@ -712,13 +1121,15 @@
     
     function updateCache() {
         try {
-            
             saveCache({
                 expenses: state.expenses,
                 fixedExpenses: state.fixedExpenses,
                 monthlyFixedExpenses: state.monthlyFixedExpenses,
                 goal: state.goal,
                 goalFixed: state.goalFixed,
+                yearlyGoal: state.yearlyGoal,
+                currency: state.currency,
+                lang: state.lang,
                 monthlyIncome: state.monthlyIncome
             });
         } catch (e) {
@@ -741,6 +1152,7 @@
                 state.goalFixed = cached.goalFixed || 0;
                 state.yearlyGoal = cached.yearlyGoal || 0;
                 state.currency = cached.currency || 'AED';
+                state.lang = cached.lang || 'pt';
                 state.fixedExpenses = cached.fixedExpenses || [];
                 
                 // Filtrar fixas mensais inválidas do cache
@@ -758,6 +1170,14 @@
                 
                 state.monthlyIncome = cached.monthlyIncome || {};
                 state.loading = false;
+
+                // Aplicar idioma do cache imediatamente, antes do render
+                const titleElCache = document.getElementById('appTitle');
+                if (titleElCache) {
+                    titleElCache.innerHTML = '💰 ' + t('appTitle');
+                    titleElCache.style.opacity = '1';
+                }
+                document.title = t('appTitle');
                 
                 if (wasLoading) {
                     render();
@@ -814,6 +1234,7 @@
                 state.goalFixed  = (m.metaFixed  != null && m.metaFixed  !== '') ? Number(m.metaFixed)  : (state.goalFixed  || 0);
                 state.yearlyGoal = (m.yearlyGoal != null && m.yearlyGoal !== '') ? Number(m.yearlyGoal) : (state.yearlyGoal || 0);
                 if (m.currency && m.currency.trim().length >= 2) state.currency = m.currency.trim().toUpperCase();
+                if (m.lang && (m.lang === 'pt' || m.lang === 'en')) state.lang = m.lang;
             } else {
                 console.error('❌ Meta falhou após retries — mantendo valores actuais');
             }
@@ -858,6 +1279,7 @@
                 goalFixed: state.goalFixed,
                 yearlyGoal: state.yearlyGoal,
                 currency: state.currency,
+                lang: state.lang,
                 monthlyIncome: state.monthlyIncome
             });
 
@@ -928,7 +1350,7 @@
     }
 
     async function updateGoalInSheets(valor) {
-        const url = `${SHEETS_URL}?action=setMeta&goal=${valor}&goalFixed=${state.goalFixed}&yearlyGoal=${state.yearlyGoal}&currency=${encodeURIComponent(state.currency || 'AED')}`;
+        const url = `${SHEETS_URL}?action=setMeta&goal=${valor}&goalFixed=${state.goalFixed}&yearlyGoal=${state.yearlyGoal}&currency=${encodeURIComponent(state.currency || 'AED')}&lang=${encodeURIComponent(state.lang || 'pt')}`;
         
         try {
             const response = await fetch(url);
@@ -941,7 +1363,7 @@
     }
     
     async function updateGoalFixedInSheets(valor) {
-        const url = `${SHEETS_URL}?action=setMeta&goal=${state.goal}&goalFixed=${valor}&yearlyGoal=${state.yearlyGoal}&currency=${encodeURIComponent(state.currency || 'AED')}`;
+        const url = `${SHEETS_URL}?action=setMeta&goal=${state.goal}&goalFixed=${valor}&yearlyGoal=${state.yearlyGoal}&currency=${encodeURIComponent(state.currency || 'AED')}&lang=${encodeURIComponent(state.lang || 'pt')}`;
         
         try {
             const response = await fetch(url);
@@ -954,7 +1376,7 @@
     }
     
     async function updateYearlyGoalInSheets(valor) {
-        const url = `${SHEETS_URL}?action=setMeta&goal=${state.goal}&goalFixed=${state.goalFixed}&yearlyGoal=${valor}&currency=${encodeURIComponent(state.currency || 'AED')}`;
+        const url = `${SHEETS_URL}?action=setMeta&goal=${state.goal}&goalFixed=${state.goalFixed}&yearlyGoal=${valor}&currency=${encodeURIComponent(state.currency || 'AED')}&lang=${encodeURIComponent(state.lang || 'pt')}`;
         
         try {
             const response = await fetch(url);
@@ -1071,7 +1493,7 @@
     }
 
     async function downloadBackup() {
-        showToast('⏳ Preparando backup...', 'success');
+        showToast(t('backupPreparando'));
 
         const now = new Date();
         const dd = String(now.getDate()).padStart(2,'0');
@@ -1173,7 +1595,27 @@
 
         // Download
         XLSX.writeFile(wb, filename);
-        showToast('✅ Backup baixado: ' + filename);
+        showToast(t('backupBaixado') + ' ' + filename);
+    }
+
+    async function updateLang(lang) {
+        state.lang = lang;
+        updateCache();
+        render();
+
+        // Guardar na planilha via setMeta
+        try {
+            const url = `${SHEETS_URL}?action=setMeta&goal=${state.goal}&goalFixed=${state.goalFixed}&yearlyGoal=${state.yearlyGoal}&currency=${encodeURIComponent(state.currency || 'AED')}&lang=${encodeURIComponent(lang)}`;
+            const response = await fetch(url);
+            const result = await response.json();
+            if (result.success) {
+                showToast(t('idiomaAlterado') + ' ' + (lang === 'pt' ? 'Português 🇧🇷' : 'English 🇬🇧'));
+            } else {
+                showToast(t('idiomaAlterado') + ' ' + (lang === 'pt' ? 'Português 🇧🇷' : 'English 🇬🇧'));
+            }
+        } catch (e) {
+            showToast(t('idiomaAlterado') + ' ' + (lang === 'pt' ? 'Português 🇧🇷' : 'English 🇬🇧'));
+        }
     }
 
     async function updateCurrency(value) {
@@ -1188,7 +1630,7 @@
 
         // Guardar na planilha via setMeta
         try {
-            const url = `${SHEETS_URL}?action=setMeta&goal=${state.goal}&goalFixed=${state.goalFixed}&yearlyGoal=${state.yearlyGoal}&currency=${encodeURIComponent(cur)}`;
+            const url = `${SHEETS_URL}?action=setMeta&goal=${state.goal}&goalFixed=${state.goalFixed}&yearlyGoal=${state.yearlyGoal}&currency=${encodeURIComponent(cur)}&lang=${encodeURIComponent(state.lang || 'pt')}`;
             const response = await fetch(url);
             const result = await response.json();
             if (result.success) {
@@ -1200,6 +1642,60 @@
             showToast(`✅ Moeda alterada para ${cur} (cache local)`);
         }
         return true;
+    }
+
+    function renderEditModal() {
+        if (!state.editingExpense) return '';
+        const e = state.editingExpense;
+        const cur = state.currency || 'AED';
+        const editLabel = state.lang === 'en' ? 'Edit Expense' : 'Editar Despesa';
+        const dateLabel = state.lang === 'en' ? 'Date (DD/MM/YYYY)' : 'Data (DD/MM/YYYY)';
+        const timeLabel = state.lang === 'en' ? 'Time (HH:MM:SS)' : 'Hora (HH:MM:SS)';
+        const cancelLabel = state.lang === 'en' ? 'Cancel' : 'Cancelar';
+        const saveLabel = state.lang === 'en' ? 'Save' : 'Salvar';
+
+        let catOptions = '';
+        getCategories().forEach(cat => {
+            const selected = e.category === cat.id ? 'selected' : '';
+            catOptions += '<div class="category-item ' + selected + '" onclick="state.editingExpense.category=&quot;' + cat.id + '&quot;; render()">'  +
+                '<div class="category-icon">' + cat.icon + '</div>' +
+                '<div class="category-name">' + cat.name + '</div>' +
+                '</div>';
+        });
+
+        return '<div class="modal" onclick="if(event.target===this)cancelEditExpense()">' +
+            '<div class="modal-content">' +
+                '<div class="modal-header">✏️ ' + editLabel + '</div>' +
+                '<div class="input-group">' +
+                    '<label class="label">' + t('estabelecimento') + ':</label>' +
+                    '<input type="text" class="input-field" value="' + (e.merchant||'') + '" onchange="state.editingExpense.merchant=this.value">' +
+                '</div>' +
+                '<div class="input-group">' +
+                    '<label class="label">' + t('valor') + ' (' + cur + '):</label>' +
+                    '<input type="number" step="0.01" class="input-field" value="' + (e.amount||0) + '" onchange="state.editingExpense.amount=parseFloat(this.value)">' +
+                '</div>' +
+                '<div class="input-group">' +
+                    '<label class="label">' + dateLabel + ':</label>' +
+                    '<input type="text" class="input-field" value="' + (e.date||'') + '" onchange="state.editingExpense.date=this.value">' +
+                '</div>' +
+                '<div class="input-group">' +
+                    '<label class="label">' + timeLabel + ':</label>' +
+                    '<input type="text" class="input-field" value="' + (e.time||'') + '" onchange="state.editingExpense.time=this.value">' +
+                '</div>' +
+                '<div class="input-group">' +
+                    '<label class="label">' + t('observacaoLabel') + '</label>' +
+                    '<input type="text" class="input-field" value="' + (e.obs||'') + '" onchange="state.editingExpense.obs=this.value">' +
+                '</div>' +
+                '<div class="input-group">' +
+                    '<label class="label">' + t('categoriaLabel') + ':</label>' +
+                    '<div class="category-list">' + catOptions + '</div>' +
+                '</div>' +
+                '<div class="modal-buttons">' +
+                    '<button class="btn btn-secondary" onclick="cancelEditExpense()">' + cancelLabel + '</button>' +
+                    '<button class="btn" onclick="saveEditExpense()">' + saveLabel + '</button>' +
+                '</div>' +
+            '</div>' +
+        '</div>';
     }
 
     // Utilitário: converte DD/MM/YYYY → YYYY-MM-DD
@@ -1237,14 +1733,14 @@
             return '<div class="expense-item">' +
                 '<div class="expense-info">' +
                     '<div class="expense-merchant">' + merchant + '</div>' +
-                    '<div class="expense-date">' + date + ' às ' + time + '</div>' +
+                    '<div class="expense-date">' + date + ' ' + t('as') + ' ' + time + '</div>' +
                     (obs ? '<div class="expense-date" style="font-style: italic; margin-top: 4px;">💬 ' + obs + '</div>' : '') +
                     '<span class="expense-category" style="background: ' + getCategoryColor(category) + '">' + getCategoryIcon(category) + ' ' + getCategoryName(category) + '</span>' +
                 '</div>' +
                 '<div style="display:flex; align-items:center;">' +
                     '<div class="expense-amount">' + cur + ' ' + amount.toFixed(2) + '</div>' +
-                    '<button class="edit-btn" onclick="startEditExpense(\"' + e.id + '\")">✏️</button>' +
-                    '<button class="delete-btn" onclick="deleteExpense(\"' + e.id + '\")">🗑️</button>' +
+                    '<button class="edit-btn" data-action="edit" data-id="' + e.id + '">✏️</button>' +
+                    '<button class="delete-btn" data-action="delete" data-id="' + e.id + '">🗑️</button>' +
                 '</div>' +
             '</div>';
         }).join('');
@@ -1307,14 +1803,14 @@
             html += '<div class="expense-item">' +
                 '<div class="expense-info">' +
                     '<div class="expense-merchant">' + merchant + '</div>' +
-                    '<div class="expense-date">' + date + ' às ' + time + '</div>' +
+                    '<div class="expense-date">' + date + ' ' + t('as') + ' ' + time + '</div>' +
                     (obs ? '<div class="expense-date" style="font-style: italic; margin-top: 4px;">💬 ' + obs + '</div>' : '') +
                     '<span class="expense-category" style="background: ' + getCategoryColor(category) + '">' + getCategoryIcon(category) + ' ' + getCategoryName(category) + '</span>' +
                 '</div>' +
                 '<div style="display:flex; align-items:center;">' +
                     '<div class="expense-amount">' + cur + ' ' + amount.toFixed(2) + '</div>' +
-                    '<button class="edit-btn" onclick="startEditExpense(\"' + e.id + '\")">✏️</button>' +
-                    '<button class="delete-btn" onclick="deleteExpense(\"' + e.id + '\")">🗑️</button>' +
+                    '<button class="edit-btn" data-action="edit" data-id="' + e.id + '">✏️</button>' +
+                    '<button class="delete-btn" data-action="delete" data-id="' + e.id + '">🗑️</button>' +
                 '</div>' +
             '</div>';
         });
@@ -1349,7 +1845,7 @@
                 <div style="padding: 18px 20px; border-bottom: 1px solid rgba(255,255,255,0.07);
                             display: flex; justify-content: space-between; align-items: center;">
                     <div>
-                        <h3 style="margin: 0; color: #F0F4FF; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.05em;">⚙️ Configurações</h3>
+                        <h3 style="margin: 0; color: #F0F4FF; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.05em;">${t('configuracoes')}</h3>
                     </div>
                     <button onclick="this.closest('.modal-overlay').remove()" style="
                         background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
@@ -1363,13 +1859,13 @@
                     <!-- Secção Limites -->
                     <div>
                         <div style="font-size: 0.72rem; color: #4E627A; text-transform: uppercase;
-                                    letter-spacing: 0.08em; margin-bottom: 12px;">Limites Mensais</div>
+                                    letter-spacing: 0.08em; margin-bottom: 12px;">${t('limitesMensais')}</div>
 
                         <div style="display: flex; flex-direction: column; gap: 10px;">
                             <div>
                                 <label style="display: block; font-size: 0.78rem; color: #94A3B8;
                                               margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">
-                                    💸 Despesas Variáveis (<span class="settings-currency-label">${state.currency || 'AED'}</span>)
+                                    ${t('despesasVariaveis')} (<span class="settings-currency-label">${state.currency || 'AED'}</span>)
                                 </label>
                                 <div style="display: flex; gap: 8px;">
                                     <input type="number" id="settingsGoalInput" value="${state.goal}"
@@ -1394,13 +1890,13 @@
                                              border-radius: 8px; color: #94A3B8; font-size: 0.8rem; font-weight: 700;
                                              cursor: pointer; white-space: nowrap; transition: all 0.2s; flex-shrink: 0;">💾</button>
                                 </div>
-                                <div style="font-size: 0.72rem; color: #4E627A; margin-top: 4px;">Mercado, restaurante, transporte, etc.</div>
+                                <div style="font-size: 0.72rem; color: #4E627A; margin-top: 4px;">${t('mercadoRestaurante')}</div>
                             </div>
 
                             <div>
                                 <label style="display: block; font-size: 0.78rem; color: #94A3B8;
                                               margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">
-                                    💳 Despesas Fixas (<span class="settings-currency-label">${state.currency || 'AED'}</span>)
+                                    ${t('despesasFixasLabel')} (<span class="settings-currency-label">${state.currency || 'AED'}</span>)
                                 </label>
                                 <div style="display: flex; gap: 8px;">
                                     <input type="number" id="settingsGoalFixedInput" value="${state.goalFixed}"
@@ -1421,13 +1917,13 @@
                                              border-radius: 8px; color: #94A3B8; font-size: 0.8rem; font-weight: 700;
                                              cursor: pointer; white-space: nowrap; transition: all 0.2s; flex-shrink: 0;">💾</button>
                                 </div>
-                                <div style="font-size: 0.72rem; color: #4E627A; margin-top: 4px;">Aluguel, contas, assinaturas, etc.</div>
+                                <div style="font-size: 0.72rem; color: #4E627A; margin-top: 4px;">${t('aluguelContas')}</div>
                             </div>
 
                             <div>
                                 <label style="display: block; font-size: 0.78rem; color: #94A3B8;
                                               margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">
-                                    🎯 Meta de Economia Anual (<span class="settings-currency-label">${state.currency || 'AED'}</span>)
+                                    ${t('metaEconomiaAnual')} (<span class="settings-currency-label">${state.currency || 'AED'}</span>)
                                 </label>
                                 <div style="display: flex; gap: 8px;">
                                     <input type="number" id="settingsYearlyGoalInput" value="${state.yearlyGoal}"
@@ -1448,14 +1944,14 @@
                                              border-radius: 8px; color: #94A3B8; font-size: 0.8rem; font-weight: 700;
                                              cursor: pointer; white-space: nowrap; transition: all 0.2s; flex-shrink: 0;">💾</button>
                                 </div>
-                                <div style="font-size: 0.72rem; color: #4E627A; margin-top: 4px;">Quanto deseja economizar este ano?</div>
+                                <div style="font-size: 0.72rem; color: #4E627A; margin-top: 4px;">${t('quantoEconomizar')}</div>
                             </div>
 
                             <!-- Total -->
                             <div style="padding: 12px 14px; background: rgba(0,212,170,0.06);
                                         border: 1px solid rgba(0,212,170,0.15); border-radius: 8px;
                                         display: flex; justify-content: space-between; align-items: center;">
-                                <span style="font-size: 0.8rem; color: #94A3B8;">📊 Limite Total Mensal</span>
+                                <span style="font-size: 0.8rem; color: #94A3B8;">${t('limiteTotalMensal')}</span>
                                 <span style="font-size: 1.1rem; font-weight: 700; color: #00D4AA; font-variant-numeric: tabular-nums;">
                                     ${formatAEDShort(state.goal + state.goalFixed)}
                                 </span>
@@ -1469,10 +1965,10 @@
                     <!-- Secção Moeda -->
                     <div>
                         <div style="font-size: 0.72rem; color: #4E627A; text-transform: uppercase;
-                                    letter-spacing: 0.08em; margin-bottom: 12px;">Moeda</div>
+                                    letter-spacing: 0.08em; margin-bottom: 12px;">${t('moeda')}</div>
                         <label style="display: block; font-size: 0.78rem; color: #94A3B8;
                                       margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">
-                            💱 Moeda do Sistema
+                            ${t('moedaSistema')}
                         </label>
                         <div style="display: flex; gap: 8px;">
                             <select id="settingsCurrencySelect" style="
@@ -1501,7 +1997,38 @@
                                      cursor: pointer; white-space: nowrap; transition: all 0.2s; flex-shrink: 0;">💾</button>
                         </div>
                         <div style="font-size: 0.72rem; color: #4E627A; margin-top: 4px;">
-                            Afeta todos os valores exibidos no app
+                            ${t('afetaTodos')}
+                        </div>
+                    </div>
+
+                    <!-- Separador -->
+                    <div style="border-top: 1px solid rgba(255,255,255,0.07);"></div>
+
+                    <!-- Secção Idioma -->
+                    <div>
+                        <div style="font-size: 0.72rem; color: #4E627A; text-transform: uppercase;
+                                    letter-spacing: 0.08em; margin-bottom: 12px;">${t('idioma')}</div>
+                        <label style="display: block; font-size: 0.78rem; color: #94A3B8;
+                                      margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">
+                            ${t('idiomaLabel')}
+                        </label>
+                        <div style="display: flex; gap: 8px;">
+                            <button onclick="updateLang('pt'); this.closest('.modal-overlay').remove();"
+                                style="flex: 1; padding: 11px 14px; border-radius: 8px; cursor: pointer;
+                                       font-size: 0.9rem; font-weight: 700; transition: all 0.2s;
+                                       ${state.lang === 'pt'
+                                           ? 'background: rgba(0,212,170,0.15); border: 1px solid rgba(0,212,170,0.5); color: #00D4AA;'
+                                           : 'background: #162035; border: 1px solid rgba(255,255,255,0.1); color: #94A3B8;'}">
+                                🇧🇷 Português
+                            </button>
+                            <button onclick="updateLang('en'); this.closest('.modal-overlay').remove();"
+                                style="flex: 1; padding: 11px 14px; border-radius: 8px; cursor: pointer;
+                                       font-size: 0.9rem; font-weight: 700; transition: all 0.2s;
+                                       ${state.lang === 'en'
+                                           ? 'background: rgba(0,212,170,0.15); border: 1px solid rgba(0,212,170,0.5); color: #00D4AA;'
+                                           : 'background: #162035; border: 1px solid rgba(255,255,255,0.1); color: #94A3B8;'}">
+                                🇬🇧 English
+                            </button>
                         </div>
                     </div>
 
@@ -1511,7 +2038,7 @@
                     <!-- Secção Backup -->
                     <div>
                         <div style="font-size: 0.72rem; color: #4E627A; text-transform: uppercase;
-                                    letter-spacing: 0.08em; margin-bottom: 12px;">Dados</div>
+                                    letter-spacing: 0.08em; margin-bottom: 12px;">${t('dados')}</div>
                         <button onclick="this.closest('.modal-overlay').remove(); downloadBackup();"
                                 style="width: 100%; padding: 13px; background: transparent;
                                        border: 1px solid rgba(255,255,255,0.12); border-radius: 8px;
@@ -1520,7 +2047,7 @@
                                        display: flex; align-items: center; justify-content: center; gap: 8px;"
                                 onmouseover="this.style.borderColor='rgba(0,212,170,0.4)'; this.style.color='#00D4AA';"
                                 onmouseout="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.color='#94A3B8';">
-                            💾 Download Backup (XLSX)
+                            ${t('downloadBackup')}
                         </button>
                     </div>
 
@@ -1576,25 +2103,33 @@
                    String(d.getSeconds()).padStart(2,'0');
         }
 
+        // Detectar moeda no texto do SMS
+        function detectCurrency(text) {
+            const m = text.match(/\b(AED|USD|EUR|GBP|BRL|CHF|CAD|AUD|JPY|CNY)\b/i);
+            return m ? m[1].toUpperCase() : null;
+        }
+
         // ── Padrão 1 (Lucas/Etihad): "Purchase of AED 355.00 with Credit Card ending 3783 at MIYABI SUSHI, DUBAI"
         // Sem data no SMS — usa data/hora actual
-        const m1 = text.match(/Purchase\s+of\s+AED\s*([\d,\.]+).*?at\s+([^,]+)/i);
+        const m1 = text.match(/Purchase\s+of\s+([A-Z]{3})\s*([\d,\.]+).*?at\s+([^,]+)/i);
         if (m1) {
             return {
-                amount: parseFloat(m1[1].replace(/,/g, '')),
+                amount: parseFloat(m1[2].replace(/,/g, '')),
+                smsCurrency: m1[1].toUpperCase(),
                 date: todayDate(),
                 time: nowTime(),
-                merchant: m1[2].trim(),
+                merchant: m1[3].trim(),
                 id: Date.now()
             };
         }
 
         // ── Padrão 2 (André/ADCB): "Your Cr.Card XXXXX was used for AED34.65 on 03/12/2025 16:20:26 at MERCHANT"
         // Tem data e hora no SMS
-        const m2 = text.match(/(?:AED|aed)\s*([\d,\.]+).*?on\s+([\d\/]+)\s+([\d:]+).*?at\s+([^,]+)/i);
+        const m2 = text.match(/(?:AED|aed|USD|EUR|GBP|BRL)\s*([\d,\.]+).*?on\s+([\d\/]+)\s+([\d:]+).*?at\s+([^,\.]+)/i);
         if (m2) {
             return {
                 amount: parseFloat(m2[1].replace(/,/g, '')),
+                smsCurrency: detectCurrency(text.substring(0, text.indexOf(m2[1]))) || 'AED',
                 date: m2[2],
                 time: m2[3],
                 merchant: m2[4].trim(),
@@ -1603,13 +2138,15 @@
         }
 
         // ── Padrão 3: R$/USD/EUR com data e hora
-        const m3 = text.match(/(?:R\$|USD|EUR)\s*([\d,\.]+).*?(\d{2}\/\d{2}\/\d{4}).*?(\d{2}:\d{2}:\d{2}).*?(?:at|em)\s+([^,\.]+)/i);
+        const m3 = text.match(/(R\$|USD|EUR|GBP|CHF)\s*([\d,\.]+).*?(\d{2}\/\d{2}\/\d{4}).*?(\d{2}:\d{2}:\d{2}).*?(?:at|em)\s+([^,\.]+)/i);
         if (m3) {
+            const currMap = {'R$':'BRL','USD':'USD','EUR':'EUR','GBP':'GBP','CHF':'CHF'};
             return {
-                amount: parseFloat(m3[1].replace(/,/g, '')),
-                date: m3[2],
-                time: m3[3],
-                merchant: m3[4].trim(),
+                amount: parseFloat(m3[2].replace(/,/g, '')),
+                smsCurrency: currMap[m3[1].toUpperCase()] || m3[1].toUpperCase(),
+                date: m3[3],
+                time: m3[4],
+                merchant: m3[5].trim(),
                 id: Date.now()
             };
         }
@@ -1638,6 +2175,21 @@
         event.target.closest('.category-item').classList.add('selected');
     }
 
+    // Busca taxa de câmbio via open.er-api.com (gratuito, sem chave, CORS ok)
+    async function fetchExchangeRate(from, to) {
+        if (from === to) return 1;
+        from = from.toUpperCase();
+        to = to.toUpperCase();
+        try {
+            const res = await fetch(`https://open.er-api.com/v6/latest/${from}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.rates && data.rates[to]) return data.rates[to];
+            }
+        } catch(e) {}
+        return null;
+    }
+
     async function addExpense() {
         // Lock para evitar duplo envio
         if (state.saving) return;
@@ -1653,29 +2205,45 @@
         const parsed = parseSMS(state.sms);
         if (!parsed) {
             state.saving = false;
-            alert('❌ Não consegui extrair os dados. Verifique o formato do SMS.');
+            alert(t('erroExtract'));
             return;
         }
         if (!state.selectedCategory) {
             state.saving = false;
-            alert('❌ Por favor, selecione uma categoria para a despesa.');
+            alert(t('erroCategoria'));
             return;
         }
 
-        // ✅ ID único gerado no momento do clique — cada tentativa tem ID diferente,
-        // evitando duplicações com o mesmo ID em caso de retentativa com internet lenta
+        // ✅ ID único gerado no momento do clique
         parsed.id = String(Date.now());
         parsed.category = state.selectedCategory;
         parsed.obs = state.obs || '';
 
+        // ── Conversão de moeda se o SMS usa moeda diferente ──────────────
+        const smsCur = (parsed.smsCurrency || state.currency || 'AED').toUpperCase();
+        const sysCur = (state.currency || 'AED').toUpperCase();
+        if (smsCur !== sysCur) {
+            const btnConv = document.querySelector('.btn-add-expense');
+            if (btnConv) { btnConv.disabled = true; btnConv.textContent = '💱 ' + smsCur + '→' + sysCur + '...'; }
+            const rate = await fetchExchangeRate(smsCur, sysCur);
+            if (rate) {
+                const originalAmount = parsed.amount;
+                parsed.amount = Math.round(originalAmount * rate * 100) / 100;
+                showToast('💱 ' + smsCur + ' ' + originalAmount.toFixed(2) + ' → ' + sysCur + ' ' + parsed.amount.toFixed(2) + ' (1 ' + smsCur + ' = ' + rate.toFixed(4) + ' ' + sysCur + ')');
+            } else {
+                // Fallback: ask user to enter amount manually
+                showToast('⚠️ ' + smsCur + '→' + sysCur + ': taxa não disponível. Verifique o valor manualmente.', 'error');
+            }
+        }
+
         const btn = document.querySelector('.btn-add-expense');
-        if (btn) { btn.disabled = true; btn.textContent = 'Salvando...'; }
+        if (btn) { btn.disabled = true; btn.textContent = t('salvando'); }
 
         const success = await addExpenseToSheets(parsed);
 
         // Sempre reabilitar o botão e liberar o lock
         state.saving = false;
-        if (btn) { btn.disabled = false; btn.textContent = 'Extrair e Adicionar'; }
+        if (btn) { btn.disabled = false; btn.textContent = t('extrairAdicionar'); }
 
         if (success) {
             // ✅ OTIMIZAÇÃO: Atualizar state localmente sem recarregar
@@ -1685,14 +2253,14 @@
             state.obs = '';
             state.selectedCategory = null;
             render();
-            showToast('✅ Despesa salva no Google Sheets!');
+            showToast(t('despesaSalva'));
         } else {
-            showToast('❌ Erro ao salvar. Tente novamente.', 'error');
+            showToast(t('erroSalvar'), 'error');
         }
     }
 
     async function deleteExpense(id) {
-        if (confirm('Excluir esta despesa?')) {
+        if (confirm(t('confirmarExcluir'))) {
             const success = await deleteExpenseFromSheets(id);
             
             if (success) {
@@ -1731,9 +2299,9 @@
             updateCache();
             state.editingExpense = null;
             render();
-            showToast('✅ Despesa atualizada com sucesso!');
+            showToast(t('despesaAtualizada'));
         } else {
-            showToast('❌ Erro ao atualizar. Tente novamente.', 'error');
+            showToast(t('erroAtualizar'), 'error');
         }
     }
 
@@ -1794,7 +2362,7 @@
         
         const value = parseFloat(input.value) || 0;
         if (value < 0) {
-            showToast('⚠️ O rendimento não pode ser negativo', 'error');
+            showToast(t('rendimentoNegativo'), 'error');
             return;
         }
         
@@ -1824,7 +2392,7 @@
                     if (btn) { btn.innerHTML = originalText; btn.style.background = ''; btn.disabled = false; }
                 }, 1500);
 
-                showToast(`✅ Rendimento de ${state.currency || 'AED'} ${value.toFixed(0)} salvo com sucesso!`);
+                showToast(t('rendimentoSalvo') + ' ' + (state.currency || 'AED') + ' ' + value.toFixed(0) + ' ' + t('rendimentoSalvoSufixo'));
                 render();
             } else {
                 throw new Error(result.error || 'Erro desconhecido');
@@ -1853,7 +2421,7 @@
             animation: fadeIn 0.2s;
         `;
         
-        const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        const monthNames = t('monthNames');
         const now = new Date();
         const currentKey = `${now.getMonth() + 1}/${now.getFullYear()}`;
 
@@ -1880,8 +2448,8 @@
         html += '<div style="padding: 18px 20px; border-bottom: 1px solid rgba(255,255,255,0.07); ';
         html += 'display: flex; justify-content: space-between; align-items: center;">';
         html += '<div>';
-        html += '<h3 style="margin: 0; color: #F0F4FF; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.04em;">💰 Gerir Rendimentos</h3>';
-        html += '<div style="font-size: 0.72rem; color: #4E627A; margin-top: 3px;">↑ futuros &nbsp;·&nbsp; mês actual ao centro &nbsp;·&nbsp; passados ↓</div>';
+        html += '<h3 style="margin: 0; color: #F0F4FF; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.04em;">'+t('gerirRendimentos')+'</h3>';
+        html += '<div style="font-size: 0.72rem; color: #4E627A; margin-top: 3px;">'+ t('futurosMeses') +'</div>';
         html += '</div>';
         html += '<button onclick="this.closest(' + "'.modal-overlay').remove()" + '" ';
         html += 'style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #94A3B8; ';
@@ -1917,7 +2485,7 @@
             
             html += '<div style="display: flex; gap: 8px;">';
             html += '<input type="number" id="income_' + month.key.replace('/', '_') + '" ';
-            html += 'placeholder="Rendimento..." value="' + (month.value || '') + '" ';
+            html += 'placeholder="' + t('rendimentoPlaceholder') + '" value="' + (month.value || '') + '" ';
             html += 'style="flex: 1; padding: 9px 12px; border: 1px solid rgba(255,255,255,0.1); ';
             html += 'border-radius: 7px; background: rgba(255,255,255,0.05); color: #F0F4FF; font-size: 0.9rem;" />';
             html += '<button onclick="saveIncomeForMonth(' + "'" + month.key + "'" + ')" ';
@@ -1933,7 +2501,7 @@
         // Footer
         html += '<div style="padding: 12px 20px; border-top: 1px solid rgba(255,255,255,0.07); ';
         html += 'text-align: center; font-size: 0.75rem; color: #4E627A;">';
-        html += '6 meses futuros · mês actual · 12 meses passados';
+        html += t('mesesFuturos');
         html += '</div>';
         
         html += '</div>';
@@ -1965,7 +2533,7 @@
         
         const value = parseFloat(input.value) || 0;
         if (value < 0) {
-            showToast('⚠️ O rendimento não pode ser negativo', 'error');
+            showToast(t('rendimentoNegativo'), 'error');
             return;
         }
 
@@ -1992,9 +2560,9 @@
                     if (btn) { btn.innerHTML = originalText; btn.style.background = '#22c55e'; btn.disabled = false; }
                 }, 1500);
 
-                const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+                const monthNames = t('monthNames');
                 const [m, y] = monthKey.split('/');
-                showToast(`✅ Rendimento de ${monthNames[parseInt(m)-1]} ${y} salvo: ${state.currency || 'AED'} ${value.toFixed(0)}`);
+                showToast(t('rendimentoSalvo') + ' ' + monthNames[parseInt(m)-1] + ' ' + y + ' ' + t('rendimentoSalvoSufixo') + ' ' + (state.currency || 'AED') + ' ' + value.toFixed(0));
             } else {
                 throw new Error(result.error || 'Erro desconhecido');
             }
@@ -2152,7 +2720,7 @@
                 // ✅ OTIMIZAÇÃO: Inserir fixa localmente sem recarregar tudo
                 state.fixedExpenses.push(fixedExpense);
                 updateCache();
-                alert('✅ Despesa fixa adicionada!');
+                alert(t('fixaAdicionada'));
                 
                 // Limpar campos
                 document.getElementById('fixedName').value = '';
@@ -2201,7 +2769,7 @@
             const result = await response.json();
             
             if (result.success) {
-                alert('✅ Despesa fixa atualizada!');
+                alert(t('fixaAtualizada'));
                 state.editingFixed = null;
                 await loadData(true); // ← FORÇAR REFRESH
                 
@@ -2291,7 +2859,7 @@
         const category = state.selectedCategory;
         
         if (!name || !amount || !day || !category) {
-            alert('Por favor, preencha todos os campos!');
+            alert(t('erroPreencha'));
             return;
         }
         
@@ -2303,7 +2871,7 @@
         
         if (btn) {
             btn.disabled = true;
-            btn.innerHTML = '⏳ Salvando...';
+            btn.innerHTML = '⏳ ' + t('salvando');
             btn.style.opacity = '0.6';
         }
         
@@ -2326,10 +2894,10 @@
         );
         
         if (exists) {
-            alert('⚠️ Esta despesa fixa já existe neste mês!');
+            alert(t('erroJaExiste'));
             if (btn) {
                 btn.disabled = false;
-                btn.innerHTML = '➕ Adicionar Despesa Fixa';
+                btn.innerHTML = ('➕ ' + t('adicionarFixaMonthly').replace('➕ ',''));
                 btn.style.opacity = '1';
             }
             return;
@@ -2364,7 +2932,7 @@
             alert('❌ Erro ao adicionar despesa fixa. Tente novamente.');
             if (btn) {
                 btn.disabled = false;
-                btn.innerHTML = '➕ Adicionar Despesa Fixa';
+                btn.innerHTML = ('➕ ' + t('adicionarFixaMonthly').replace('➕ ',''));
                 btn.style.opacity = '1';
             }
         }
@@ -2400,7 +2968,7 @@
         const category = state.selectedCategory;
         
         if (!name || !amount || !day || !category) {
-            alert('Por favor, preencha todos os campos!');
+            alert(t('erroPreencha'));
             return;
         }
         
@@ -2427,15 +2995,15 @@
                 state.selectedCategory = null;
                 updateCache();
                 render();
-                alert('✅ Despesa fixa atualizada com sucesso!');
+                alert(t('fixaAtualizada'));
             } else {
-                alert('❌ Erro ao atualizar despesa fixa. Tente novamente.');
+                alert(t('erroAtualizarFixa'));
             }
         }
     }
     
     async function deleteMonthlyFixedExpense(id) {
-        if (!confirm('Tem certeza que deseja excluir esta despesa fixa deste mês?')) {
+        if (!confirm(t('confirmarExcluirFixa'))) {
             return;
         }
         
@@ -2449,11 +3017,11 @@
         if (success) {
             updateCache();
             render();
-            alert('✅ Despesa fixa excluída com sucesso!');
+            alert(t('fixaExcluida'));
         } else {
             // Reverter se falhou
             state.monthlyFixedExpenses[state.selectedFixedMonth] = originalList;
-            alert('❌ Erro ao excluir despesa fixa. Tente novamente.');
+            alert(t('erroExcluirFixa'));
         }
     }
     
@@ -2464,12 +3032,12 @@
         const previousMonth = `${previousMonthNum}/${previousYearNum}`;
         
         if (!state.monthlyFixedExpenses[previousMonth] || state.monthlyFixedExpenses[previousMonth].length === 0) {
-            alert('❌ Mês anterior não possui despesas fixas cadastradas.');
+            alert(t('erroMesAnterior'));
             return;
         }
         
         if (state.monthlyFixedExpenses[state.selectedFixedMonth] && state.monthlyFixedExpenses[state.selectedFixedMonth].length > 0) {
-            alert('❌ Este mês já possui despesas fixas cadastradas. Delete-as primeiro se quiser copiar do mês anterior.');
+            alert(t('erroJaPossui'));
             return;
         }
         
@@ -2483,7 +3051,7 @@
         if (success) {
             // Recarregar fixas do mês atual
             await loadMonthlyFixed(state.selectedFixedMonth);
-            alert('✅ Despesas fixas copiadas com sucesso!');
+            alert(t('fixaCopiada'));
         }
     }
     
@@ -2498,7 +3066,7 @@
             // Mostrar feedback visual
             const btn = event.target.closest('button');
             const originalText = btn.innerHTML;
-            btn.innerHTML = '✅ Colado!';
+            btn.innerHTML = t('colado');
             btn.style.background = 'rgba(34, 197, 94, 0.2)';
             btn.style.color = '#22c55e';
             
@@ -2514,7 +3082,7 @@
             // Se der erro (permissão negada), mostrar mensagem
             const btn = event.target.closest('button');
             const originalText = btn.innerHTML;
-            btn.innerHTML = '❌ Erro';
+            btn.innerHTML = t('erroPermissao');
             btn.style.background = 'rgba(239, 68, 68, 0.2)';
             btn.style.color = '#ef4444';
             
@@ -2524,7 +3092,7 @@
                 btn.style.color = 'rgba(255,255,255,0.7)';
             }, 1500);
             
-            alert('⚠️ Não foi possível acessar a área de transferência.\n\nPor favor, cole manualmente usando Ctrl+V (ou Command+V).');
+            alert(t('erroClipboard'));
         }
     }
 
@@ -2535,12 +3103,12 @@
         const time = document.getElementById('manualTime').value;
         
         if (!merchant || !amount || !date || !time) {
-            alert('⚠️ Preencha todos os campos obrigatórios');
+            alert(t('erroCampos'));
             return;
         }
         
         if (!state.selectedCategory) {
-            alert('⚠️ Selecione uma categoria');
+            alert(t('erroSelecionarCategoria'));
             return;
         }
         
@@ -2549,7 +3117,7 @@
         if (state.saving) return;
         state.saving = true;
         btn.disabled = true;
-        btn.textContent = 'Salvando...';
+        btn.textContent = t('salvando');
         
         const expense = {
             id: Date.now(),
@@ -2566,7 +3134,7 @@
         // Sempre reabilitar o botão e liberar o lock, independente do resultado
         state.saving = false;
         btn.disabled = false;
-        btn.textContent = 'Adicionar Manualmente';
+        btn.textContent = t('adicionarManualmente');
 
         if (success) {
             // ✅ OTIMIZAÇÃO: Atualizar state localmente sem recarregar tudo do servidor
@@ -2581,9 +3149,9 @@
             state.obs = '';
             state.selectedCategory = null;
             render();
-            showToast('✅ Despesa salva no Google Sheets!');
+            showToast(t('despesaSalva'));
         } else {
-            showToast('❌ Erro ao salvar. Tente novamente.', 'error');
+            showToast(t('erroSalvar'), 'error');
         }
     }
 
@@ -2611,7 +3179,7 @@
         // Quanto poderia ter gastado até agora (proporcional aos dias)
         const poderiaGastar = (state.goal * monthDays.passed) / monthDays.total;
         
-        // Ritmo: gasto real / poderia gastar * 100
+        // ${t('ritmoLabel')}: gasto real / poderia gastar * 100
         const ritmo = poderiaGastar > 0 ? (total / poderiaGastar * 100) : 0;
         
         // Determinar status e cor
@@ -2620,23 +3188,23 @@
         let emoji = '';
         
         if (ritmo < 80) {
-            status = 'Excelente';
+            status = t('excelente');
             cor = '#22c55e'; // Verde escuro
             emoji = '🟢';
         } else if (ritmo < 100) {
-            status = 'Bom';
+            status = t('bom');
             cor = '#84cc16'; // Verde claro
             emoji = '🟢';
         } else if (ritmo < 110) {
-            status = 'Atenção';
+            status = t('atencao');
             cor = '#fbbf24'; // Amarelo
             emoji = '🟡';
         } else if (ritmo < 120) {
-            status = 'Cuidado';
+            status = t('cuidado');
             cor = '#fb923c'; // Laranja
             emoji = '🟠';
         } else {
-            status = 'Crítico';
+            status = t('critico');
             cor = '#f87171'; // Vermelho suave
             emoji = '🔴';
         }
@@ -2701,7 +3269,7 @@
     }
 
     async function generateAnnualReport(year) {
-        try { await loadJsPDF(); } catch(e) { showToast('❌ Erro ao carregar gerador de PDF', 'error'); return; }
+        try { await loadJsPDF(); } catch(e) { showToast(t('erroPDF'), 'error'); return; }
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF({
             orientation: 'landscape',
@@ -2727,10 +3295,10 @@
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(24);
         doc.setFont(undefined, 'bold');
-        doc.text(`Relatorio Financeiro ${year}`, 148.5, 15, { align: 'center' }); // centro = 297/2
+        doc.text((state.lang==='en'?`Financial Report ${year}`:`Relatório Financeiro ${year}`), 148.5, 15, { align: 'center' }); // centro = 297/2
         doc.setFontSize(12);
         doc.setFont(undefined, 'normal');
-        doc.text('Balanco Anual da Familia', 148.5, 25, { align: 'center' });
+        doc.text(state.lang==='en'?'Annual Family Balance':'Balanço Anual da Família', 148.5, 25, { align: 'center' });
         
         let yPos = 45;
         
@@ -2774,7 +3342,7 @@
             const balance = income - (fixedTotal + variableTotal);
             
             monthlyData.push({
-                month: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][month - 1],
+                month: t('monthNames')[month - 1],
                 income,
                 fixed: fixedTotal,
                 variable: variableTotal,
@@ -2790,19 +3358,19 @@
         doc.setFontSize(16);
         doc.setTextColor(102, 126, 234);
         doc.setFont(undefined, 'bold');
-        doc.text('Resumo Anual', 14, yPos);
+        doc.text(state.lang==='en'?'Annual Summary':'Resumo Anual', 14, yPos);
         yPos += 10;
         
         // Tabela de resumo
         doc.autoTable({
             startY: yPos,
-            head: [['Descricao', `Valor (${state.currency || 'AED'})`]],
+            head: [[state.lang==='en'?'Description':'Descrição', (state.lang==='en'?'Amount':'Valor') + ' (' + (state.currency || 'AED') + ')']],
             body: [
-                ['Total de Rendimentos', `${totalIncome.toFixed(2)}`],
-                ['Total de Despesas Fixas', `${totalFixedExpenses.toFixed(2)}`],
-                ['Total de Despesas Variaveis', `${totalVariableExpenses.toFixed(2)}`],
-                ['Total de Despesas', `${totalExpenses.toFixed(2)}`],
-                ['Balanco Final', `${totalBalance.toFixed(2)}`]
+                [state.lang==='en'?'Total Income':'Total de Rendimentos', `${totalIncome.toFixed(2)}`],
+                [t('totalDespesasFixas'), `${totalFixedExpenses.toFixed(2)}`],
+                [state.lang==='en'?'Total Variable Expenses':'Total de Despesas Variáveis', `${totalVariableExpenses.toFixed(2)}`],
+                [state.lang==='en'?'Total Expenses':'Total de Despesas', `${totalExpenses.toFixed(2)}`],
+                [state.lang==='en'?'Final Balance':'Balanço Final', `${totalBalance.toFixed(2)}`]
             ],
             theme: 'grid',
             headStyles: { fillColor: [102, 126, 234], textColor: 255, fontStyle: 'bold' },
@@ -2849,7 +3417,7 @@
             return [name, ...amounts.map(a => a > 0 ? a.toFixed(0) : ''), total.toFixed(0)];
         });
         
-        const fixedTotalRow = ['Total de Despesas Fixas'];
+        const fixedTotalRow = [t('totalDespesasFixas')];
         for (let i = 0; i < 12; i++) {
             const monthTotal = Object.values(fixedByName).reduce((sum, amounts) => sum + amounts[i], 0);
             fixedTotalRow.push(monthTotal > 0 ? monthTotal.toFixed(0) : '0');
@@ -2874,7 +3442,7 @@
             
             variableList.forEach(e => {
                 const cat = CATEGORIES.find(c => c.id === e.category);
-                const catName = cat ? cat.name : 'Outros';
+                const catName = cat ? cat.name : t('outros');
                 if (variableByCategory[catName]) {
                     variableByCategory[catName][month - 1] += parseFloat(e.amount) || 0;
                 }
@@ -2888,7 +3456,7 @@
                 return [name, ...amounts.map(a => a > 0 ? a.toFixed(0) : ''), total.toFixed(0)];
             });
         
-        const variableTotalRow = ['Total de Despesas Variaveis'];
+        const variableTotalRow = [state.lang==='en'?'Total Variable Expenses':'Total de Despesas Variáveis'];
         for (let i = 0; i < 12; i++) {
             const monthTotal = Object.values(variableByCategory).reduce((sum, amounts) => sum + amounts[i], 0);
             variableTotalRow.push(monthTotal > 0 ? monthTotal.toFixed(0) : '0');
@@ -2912,23 +3480,23 @@
         // Montar tabela unificada
         const unifiedTableData = [
             // Header de Rendimentos COM valores
-            ['Rendimentos', ...incomeMonthlyRow],
+            [(state.lang==='en'?'Income':'Rendimentos'), ...incomeMonthlyRow],
             
             // Header de Despesas Fixas
-            [{ content: 'Despesas Fixas', colSpan: 14, styles: { fillColor: [251, 146, 60], textColor: 255, fontStyle: 'bold', halign: 'left' }}],
+            [{ content: state.lang==='en'?'Fixed Expenses':'Despesas Fixas', colSpan: 14, styles: { fillColor: [251, 146, 60], textColor: 255, fontStyle: 'bold', halign: 'left' }}],
             ...fixedRows,
             fixedTotalRow,
             
             // Header de Despesas Variáveis
-            [{ content: 'Despesas Variaveis', colSpan: 14, styles: { fillColor: [139, 92, 246], textColor: 255, fontStyle: 'bold', halign: 'left' }}],
+            [{ content: state.lang==='en'?'Variable Expenses':'Despesas Variáveis', colSpan: 14, styles: { fillColor: [139, 92, 246], textColor: 255, fontStyle: 'bold', halign: 'left' }}],
             ...variableRows,
             variableTotalRow,
             
             // Header de Total de Despesas COM valores
-            ['Total de Despesas', ...totalExpensesRow],
+            [state.lang==='en'?'Total Expenses':'Total de Despesas', ...totalExpensesRow],
             
             // Header de Balanço COM valores
-            ['Balanco', ...balanceRow]
+            [(state.lang==='en'?'Balance':'Balanço'), ...balanceRow]
         ];
         
         // Calcular índices das linhas especiais (ajustados após remover linhas)
@@ -2943,7 +3511,7 @@
         
         doc.autoTable({
             startY: yPos,
-            head: [['', 'jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez', 'Total Ano']],
+            head: [['', ...t('monthNames').map(m=>m.toLowerCase()), state.lang==='en'?'Year Total':'Total Ano']],
             body: unifiedTableData,
             theme: 'grid',
             headStyles: { fillColor: [102, 126, 234], textColor: 255, fontSize: 7, cellPadding: 1 },
@@ -3023,7 +3591,7 @@
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(12);
         doc.setFont(undefined, 'bold');
-        doc.text(`Evolucao de Despesas ${year} - Top 6 Categorias`, 148.5, 12, { align: 'center' });
+        doc.text(state.lang==='en'?`Expense Evolution ${year} - Top 6 Categories`:`Evolução de Despesas ${year} - Top 6 Categorias`, 148.5, 12, { align: 'center' });
         
         // Preparar dados do gráfico (meses ativos com despesas)
         const chartCatTotals = {};
@@ -3204,7 +3772,7 @@
     function formatMonthYear(monthYear) {
         if (!monthYear) return '';
         const [month, year] = monthYear.split('/').map(Number);
-        const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        const monthNames = t('monthNames');
         return `${monthNames[month - 1]} ${year}`;
     }
 
@@ -3324,10 +3892,10 @@
                     padding: 15px;
                     margin-bottom: 20px;
                 ">
-                    <div style="font-size: 0.85rem; opacity: 0.8; margin-bottom: 5px; text-align: center;">Total da Categoria</div>
+                    <div style="font-size: 0.85rem; opacity: 0.8; margin-bottom: 5px; text-align: center;">${t('totalDaCategoria')}</div>
                     <div style="font-size: 1.8rem; font-weight: 700; text-align: center;">${state.currency || 'AED'} ${totalCategory.toFixed(2)}</div>
                     <div style="font-size: 0.75rem; opacity: 0.7; margin-top: 5px; text-align: center;">
-                        ${categoryExpenses.length} transações em ${sortedMerchants.length} estabelecimentos
+                        ${categoryExpenses.length} ${t('transacoesEm')} ${sortedMerchants.length} ${t('estabelecimentos')}
                     </div>
                     
                     <!-- Estatísticas adicionais -->
@@ -3347,15 +3915,15 @@
                             
                             return `
                                 <div style="text-align: center;">
-                                    <div style="font-size: 0.68rem; color: #94A3B8; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.05em;">Média</div>
+                                    <div style="font-size: 0.68rem; color: #94A3B8; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.05em;">${t('mediaLabel')}</div>
                                     <div style="font-size: 0.9rem; font-weight: 700; font-variant-numeric: tabular-nums;">${state.currency || 'AED'} ${avgAmount.toFixed(2)}</div>
                                 </div>
                                 <div style="text-align: center;">
-                                    <div style="font-size: 0.68rem; color: #94A3B8; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.05em;">Maior</div>
+                                    <div style="font-size: 0.68rem; color: #94A3B8; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.05em;">${t('maiorLabel')}</div>
                                     <div style="font-size: 0.9rem; font-weight: 700; font-variant-numeric: tabular-nums; color: #EF4444;">${state.currency || 'AED'} ${maxAmount.toFixed(2)}</div>
                                 </div>
                                 <div style="text-align: center;">
-                                    <div style="font-size: 0.68rem; color: #94A3B8; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.05em;">Menor</div>
+                                    <div style="font-size: 0.68rem; color: #94A3B8; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.05em;">${t('menorLabel')}</div>
                                     <div style="font-size: 0.9rem; font-weight: 700; font-variant-numeric: tabular-nums; color: #00D4AA;">${state.currency || 'AED'} ${minAmount.toFixed(2)}</div>
                                 </div>
                             `;
@@ -3364,7 +3932,7 @@
                 </div>
                 
                 <h4 style="margin-bottom: 12px; font-size: 0.78rem; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.07em;">
-                    🏪 Estabelecimentos
+                    ${t('estabelecimentosLabel')}
                 </h4>
                 
                 <div style="display: flex; flex-direction: column; gap: 10px;">
@@ -3386,7 +3954,7 @@
                                             ${state.currency || 'AED'} ${merchant.total.toFixed(2)}
                                         </div>
                                         <div style="font-size: 0.72rem; color: #94A3B8;">
-                                            ${merchant.count} ${merchant.count === 1 ? 'vez' : 'vezes'}
+                                            ${merchant.count} ${merchant.count === 1 ? t('vezLabel') : t('vezesLabel')}
                                         </div>
                                     </div>
                                 </div>
@@ -3409,7 +3977,7 @@
                                 </div>
                                 
                                 <div style="font-size: 0.7rem; color: #4E627A; text-align: right;">
-                                    ${percentage.toFixed(1)}% do total
+                                    ${percentage.toFixed(1)}% ${t('doTotalLabel')}
                                 </div>
                             </div>
                         `;
@@ -3433,9 +4001,42 @@
         
         const app = document.getElementById('app');
 
+        // Actualizar título e h1 dinamicamente com o idioma actual
+        document.title = t('appTitle');
+        const titleEl = document.getElementById('appTitle');
+        if (titleEl) {
+            titleEl.innerHTML = '💰 ' + t('appTitle');
+            titleEl.style.opacity = '1';
+        }
+
         if (state.loading) {
-            app.innerHTML = '<div class="loading">⏳ Carregando dados...</div>';
+            // Show loading overlay directly on body (not inside #app container)
+            let overlay = document.getElementById('loadingOverlay');
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.id = 'loadingOverlay';
+                overlay.className = 'loading';
+                overlay.innerHTML = `
+                    <div class="loading-logo">💰</div>
+                    <div class="loading-bars">
+                        <div class="loading-bar"></div>
+                        <div class="loading-bar"></div>
+                        <div class="loading-bar"></div>
+                        <div class="loading-bar"></div>
+                        <div class="loading-bar"></div>
+                    </div>
+                    <div class="loading-text">${t('carregando').replace('⏳ ','')}</div>
+                `;
+                document.body.appendChild(overlay);
+            }
             return;
+        }
+        // Remove loading overlay when data is ready
+        const overlay = document.getElementById('loadingOverlay');
+        if (overlay) {
+            overlay.style.transition = 'opacity 0.3s ease';
+            overlay.style.opacity = '0';
+            setTimeout(() => overlay.remove(), 300);
         }
 
         if (SHEETS_URL === 'COLE_SUA_URL_AQUI') {
@@ -3499,22 +4100,22 @@
             return monthB - monthA;
         });
         
-        const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        const monthNames = t('monthNames');
         
         if (state.tab === 'dash') {
             app.innerHTML = `
                 <div class="tabs">
-                    <button class="tab active" onclick="state.tab='dash'; render()">Dashboard</button>
-                    <button class="tab" onclick="state.tab='add'; render()">Variável</button>
-                    <button class="tab" onclick="state.tab='fixed'; render()">Fixas</button>
-                    <button class="tab" onclick="state.tab='categories'; render()">Categorias</button>
-                    <button class="tab" onclick="state.tab='list'; render()">Histórico</button>
+                    <button class="tab active" onclick="state.tab='dash'; render()">${t('dashboard')}</button>
+                    <button class="tab" onclick="state.tab='add'; render()">${t('variavel')}</button>
+                    <button class="tab" onclick="state.tab='fixed'; render()">${t('fixas')}</button>
+                    <button class="tab" onclick="state.tab='categories'; render()">${t('categorias')}</button>
+                    <button class="tab" onclick="state.tab='list'; render()">${t('historico')}</button>
                 </div>
                 
                 <!-- Card do Termômetro de Ritmo -->
                 <div class="ritmo-card">
                     <div class="ritmo-header">
-                        <div class="ritmo-title">🌡️ Termômetro de Gastos do Mês</div>
+                        <div class="ritmo-title">${t('termometro')}</div>
                     </div>
                     
                     <div class="ritmo-gauge">
@@ -3536,31 +4137,31 @@
                         <div class="ritmo-status-emoji">${ritmo.emoji}</div>
                         <div class="ritmo-status-text" style="color: ${ritmo.cor}">${ritmo.status}</div>
                         <div class="ritmo-status-desc">
-                            ${ritmo.ritmo < 80 ? 'Você está gastando BEM MENOS que poderia!' :
-                              ritmo.ritmo < 100 ? 'Você está no ritmo ideal!' :
-                              ritmo.ritmo < 110 ? 'Levemente acima do esperado' :
-                              ritmo.ritmo < 120 ? 'Você está gastando mais que poderia' :
-                              'Gastos MUITO acima do esperado!'}
+                            ${ritmo.ritmo < 80 ? t('ritmoBemMenos') :
+                              ritmo.ritmo < 100 ? t('ritmoIdeal') :
+                              ritmo.ritmo < 110 ? t('ritmoLevemente') :
+                              ritmo.ritmo < 120 ? t('ritmoMais') :
+                              t('ritmoMuito')}
                         </div>
                     </div>
                     
                     <div class="ritmo-details">
                         <div class="ritmo-detail-item">
-                            <div class="ritmo-detail-label">Gasto Real</div>
+                            <div class="ritmo-detail-label">${t('gastoAtualLabel')}</div>
                             <div class="ritmo-detail-value">${state.currency || 'AED'} ${ritmo.gastoReal.toFixed(0)}</div>
                         </div>
                         <div class="ritmo-detail-item">
-                            <div class="ritmo-detail-label">Poderia Gastar</div>
+                            <div class="ritmo-detail-label">${t('poderiaGastarLabel')}</div>
                             <div class="ritmo-detail-value">${state.currency || 'AED'} ${ritmo.poderiaGastar.toFixed(0)}</div>
                         </div>
                         <div class="ritmo-detail-item">
-                            <div class="ritmo-detail-label">Diferença</div>
+                            <div class="ritmo-detail-label">${t('diferencaLabel')}</div>
                             <div class="ritmo-detail-value" style="color: ${ritmo.diferenca > 0 ? '#ef4444' : '#22c55e'}">
                                 ${ritmo.diferenca > 0 ? '+' : ''}${ritmo.diferenca.toFixed(0)} ${state.currency || 'AED'}
                             </div>
                         </div>
                         <div class="ritmo-detail-item">
-                            <div class="ritmo-detail-label">Progresso do Mês</div>
+                            <div class="ritmo-detail-label">${t('progressoMes')}</div>
                             <div class="ritmo-detail-value">${ritmo.progressoMes.toFixed(1)}%</div>
                         </div>
                     </div>
@@ -3579,7 +4180,7 @@
                     flex-wrap: wrap;
                 ">
                     <div style="font-weight: 600; font-size: 0.9rem; opacity: 0.9;">
-                        📅 Visualizar Mês:
+                        ${t('visualizarMes')}
                     </div>
                     <select 
                         id="dashMonthSelect"
@@ -3610,62 +4211,62 @@
                 
                 <!-- Card de Limite -->
                 <div class="card">
-                    <div style="text-align:center; font-size:0.9rem; opacity:0.9;">Limite Mensal</div>
+                    <div style="text-align:center; font-size:0.9rem; opacity:0.9;">${t('limiteMensalLabel')}</div>
                     <div class="balance">${formatAEDShort(state.goal)}</div>
                     <div class="progress-bar">
                         <div class="progress-fill ${progressClass}" style="width: ${Math.min(percent, 100)}%"></div>
                     </div>
                     <div style="text-align:center; font-size:0.9rem; margin-top:10px;">
-                        ${percent.toFixed(1)}% usado
+                        ${percent.toFixed(1)}% ${t('usado')}
                     </div>
                     <div class="meta">
                         <div class="meta-item">
-                            <div class="meta-label">Gasto</div>
+                            <div class="meta-label">${t('gastoLabel')}</div>
                             <div class="meta-value">${formatAEDShort(total)}</div>
                             <div style="font-size: 0.75rem; opacity: 0.8; margin-top: 4px;">
-                                📅 ${monthDays.passed} ${monthDays.passed === 1 ? 'dia' : 'dias'} passado${monthDays.passed === 1 ? '' : 's'}
+                                📅 ${monthDays.passed} ${monthDays.passed === 1 ? t('diaPassado') : t('diasPassados')}
                             </div>
                             <div style="font-size: 0.7rem; opacity: 0.7; margin-top: 2px; color: #fbbf24;">
-                                ${monthDays.passed > 0 ? `💸 ${formatAEDShort(total / monthDays.passed)}/dia` : '💸 ' + (state.currency || 'AED') + ' 0/dia'}
+                                ${monthDays.passed > 0 ? `💸 ${formatAEDShort(total / monthDays.passed)}${t('porDia')}` : '💸 ' + (state.currency || 'AED') + ' 0' + t('porDia')}
                             </div>
                         </div>
                         <div class="meta-item">
-                            <div class="meta-label">Restante</div>
+                            <div class="meta-label">${t('restante')}</div>
                             <div class="meta-value" style="color: ${remaining < 0 ? '#fca5a5' : '#86efac'}">
                                 ${formatAEDShort(remaining)}
                             </div>
                             <div style="font-size: 0.75rem; opacity: 0.8; margin-top: 4px;">
-                                ${monthDays.isLastDay ? '📅 Último dia!' : `📅 ${monthDays.remaining} ${monthDays.remaining === 1 ? 'dia' : 'dias'} restante${monthDays.remaining === 1 ? '' : 's'}`}
+                                ${monthDays.isLastDay ? (state.lang==='en'?'📅 Last day!':'📅 Último dia!') : `📅 ${monthDays.remaining} ${monthDays.remaining === 1 ? t('diaRestante') : t('diasRestantes')}`}
                             </div>
                             <div style="font-size: 0.7rem; opacity: 0.7; margin-top: 2px; color: ${remaining < 0 ? '#fca5a5' : '#86efac'};">
-                                ${monthDays.isLastDay ? '💰 Tudo hoje' : (monthDays.remaining > 0 ? `💰 ${formatAEDShort(remaining / monthDays.remaining)}/dia` : '💰 ' + (state.currency || 'AED') + ' 0/dia')}
+                                ${monthDays.isLastDay ? (state.lang==='en'?'💰 All today':'💰 Tudo hoje') : (monthDays.remaining > 0 ? `💰 ${formatAEDShort(remaining / monthDays.remaining)}${t('porDia')}` : '💰 ' + (state.currency || 'AED') + ' 0' + t('porDia'))}
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="stats">
                     <div class="stat-card">
-                        <div class="stat-label">Transações</div>
+                        <div class="stat-label">${t('transacoes')}</div>
                         <div class="stat-value">${monthExpenses.length}</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-label">Média</div>
+                        <div class="stat-label">${t('mediaLabel')}</div>
                         <div class="stat-value">${formatAEDShort(avg)}</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-label">Maior</div>
+                        <div class="stat-label">${t('maiorLabel')}</div>
                         <div class="stat-value">${formatAEDShort(largest)}</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-label">Categorias</div>
+                        <div class="stat-label">${t('categorias')}</div>
                         <div class="stat-value">${Object.values(getCategoryStats()).filter(s => s.count > 0).length}</div>
                     </div>
                 </div>
                 
-                <!-- Card Resumo: Fixas + Variáveis -->
+                <!-- Card Resumo: ${t('fixasVariaveis')} -->
                 <div class="card" style="margin-top: 20px;">
                     <h3 style="margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
-                        📊 Resumo do Mês
+                        ${t('resumoMes')}
                     </h3>
                     
                     <div style="display: grid; gap: 15px;">
@@ -3679,10 +4280,10 @@
                             <div style="display: flex; justify-content: space-between; align-items: center;">
                                 <div>
                                     <div style="font-size: 0.85rem; opacity: 0.8; margin-bottom: 5px;">
-                                        💸 Despesas Variáveis
+                                        ${t('despesasVariaveisCard2')}
                                     </div>
                                     <div style="font-size: 0.75rem; opacity: 0.6;">
-                                        ${monthExpenses.length} transações este mês
+                                        ${monthExpenses.length} ${monthExpenses.length !== 1 ? t('transacoesMes') : t('transacaoMes')}
                                     </div>
                                 </div>
                                 <div style="text-align: right;">
@@ -3703,10 +4304,10 @@
                             <div style="display: flex; justify-content: space-between; align-items: center;">
                                 <div>
                                     <div style="font-size: 0.85rem; opacity: 0.8; margin-bottom: 5px;">
-                                        💳 Despesas Fixas
+                                        ${t('despesasFixasCard')}
                                     </div>
                                     <div style="font-size: 0.75rem; opacity: 0.6;">
-                                        ${monthlyFixed.length} despesas fixas
+                                        ${monthlyFixed.length} ${t('despesasFixas')}
                                     </div>
                                 </div>
                                 <div style="text-align: right;">
@@ -3727,10 +4328,10 @@
                             <div style="display: flex; justify-content: space-between; align-items: center;">
                                 <div>
                                     <div style="font-size: 0.9rem; opacity: 0.9; margin-bottom: 5px;">
-                                        💰 Total do Mês
+                                        ${t('totalMes')}
                                     </div>
                                     <div style="font-size: 0.75rem; opacity: 0.7;">
-                                        Fixas + Variáveis
+                                        ${t('fixasVariaveis')}
                                     </div>
                                 </div>
                                 <div style="text-align: right;">
@@ -3738,7 +4339,7 @@
                                         ${formatAED(total + totalFixed)}
                                     </div>
                                     <div style="font-size: 0.75rem; opacity: 0.7; margin-top: 5px;">
-                                        ${(((total + totalFixed) / (state.goal + state.goalFixed)) * 100).toFixed(1)}% do limite total
+                                        ${(((total + totalFixed) / (state.goal + state.goalFixed)) * 100).toFixed(1)}% ${t('doLimiteTotal')}
                                     </div>
                                 </div>
                             </div>
@@ -3767,13 +4368,13 @@
                                     border: 1px solid rgba(255,255,255,0.1);
                                 ">
                                     <div style="font-size: 0.9rem; font-weight: 600; margin-bottom: 15px; opacity: 0.9;">
-                                        📊 Comparação com Limites
+                                        ${t('comparacaoLimites')}
                                     </div>
                                     
                                     <!-- Variáveis -->
                                     <div style="margin-bottom: 15px;">
                                         <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                                            <span style="font-size: 0.8rem; opacity: 0.7;">💸 Variáveis</span>
+                                            <span style="font-size: 0.8rem; opacity: 0.7;">${t('variaveis')}</span>
                                             <span style="font-size: 0.75rem; opacity: 0.6;">
                                                 ${formatAED(totalVariaveis)} / ${formatAED(state.goal)}
                                             </span>
@@ -3793,14 +4394,14 @@
                                             "></div>
                                         </div>
                                         <div style="font-size: 0.7rem; opacity: 0.6; margin-top: 3px; text-align: right;">
-                                            ${percentVariaveis.toFixed(1)}% • ${disponivelVariaveis >= 0 ? 'Disponível' : 'Acima'}: ${formatAED(Math.abs(disponivelVariaveis))}
+                                            ${percentVariaveis.toFixed(1)}% • ${disponivelVariaveis >= 0 ? t('disponivelLabel') : t('acima')}: ${formatAED(Math.abs(disponivelVariaveis))}
                                         </div>
                                     </div>
                                     
                                     <!-- Fixas -->
                                     <div style="margin-bottom: 15px;">
                                         <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                                            <span style="font-size: 0.8rem; opacity: 0.7;">💳 Fixas</span>
+                                            <span style="font-size: 0.8rem; opacity: 0.7;">${t('fixasLabel')}</span>
                                             <span style="font-size: 0.75rem; opacity: 0.6;">
                                                 ${formatAED(totalFixas)} / ${formatAED(state.goalFixed)}
                                             </span>
@@ -3820,7 +4421,7 @@
                                             "></div>
                                         </div>
                                         <div style="font-size: 0.7rem; opacity: 0.6; margin-top: 3px; text-align: right;">
-                                            ${percentFixas.toFixed(1)}% • ${disponivelFixas >= 0 ? 'Disponível' : 'Acima'}: ${formatAED(Math.abs(disponivelFixas))}
+                                            ${percentFixas.toFixed(1)}% • ${disponivelFixas >= 0 ? t('disponivelLabel') : t('acima')}: ${formatAED(Math.abs(disponivelFixas))}
                                         </div>
                                     </div>
                                     
@@ -3830,7 +4431,7 @@
                                         padding-top: 15px;
                                     ">
                                         <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                                            <span style="font-size: 0.85rem; font-weight: 600;">💰 Total Geral</span>
+                                            <span style="font-size: 0.85rem; font-weight: 600;">${t('totalGeral')}</span>
                                             <span style="font-size: 0.8rem; font-weight: 600;">
                                                 ${formatAED(totalGeral)} / ${formatAED(limiteTotal)}
                                             </span>
@@ -3855,7 +4456,7 @@
                                             margin-top: 8px;
                                         ">
                                             <span style="font-size: 0.8rem; opacity: 0.7;">
-                                                ${percentGeral.toFixed(1)}% usado
+                                                ${percentGeral.toFixed(1)}% ${t('usado')}
                                             </span>
                                             <span style="
                                                 font-size: 0.9rem;
@@ -3920,7 +4521,7 @@
                     const remaining = state.yearlyGoal - yearlyEconomy;
                     const isOnTrack = yearlyEconomy >= 0;
                     
-                    const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+                    const monthNames = t('monthNames');
                     
                     // Usar quantidade de meses COM RENDIMENTO ao invés de meses decorridos
                     const monthsWithIncome = monthsWithData.length;
@@ -3987,7 +4588,7 @@
                                         color: ${remaining > 0 ? '#fbbf24' : '#22c55e'};
                                         text-align: right;
                                     ">
-                                        ${remaining > 0 ? 'Faltam' : 'Superou em'}: ${formatAED(Math.abs(remaining))}
+                                        ${remaining > 0 ? t('faltam') : t('superouEm2')}: ${formatAED(Math.abs(remaining))}
                                     </div>
                                 </div>
                             </div>
@@ -4032,7 +4633,7 @@
                                     </div>
                                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                                         <div>
-                                            <div style="font-size: 0.75rem; opacity: 0.7;">Média Mensal</div>
+                                            <div style="font-size: 0.75rem; opacity: 0.7;">${t('mediaMensalLabel')}</div>
                                             <div style="font-size: 1.1rem; font-weight: 700;">
                                                 ${formatAED(yearlyEconomy / monthsWithData.length)}
                                             </div>
@@ -4053,7 +4654,7 @@
                 <!-- Card de Relatório Anual -->
                 <div class="card" style="margin-top: 20px;">
                     <h3 style="margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
-                        📄 Relatório Anual em PDF
+                        ${t('relatorioAnual')}
                     </h3>
                     
                     <div style="
@@ -4063,13 +4664,13 @@
                         border: 1px solid rgba(255,255,255,0.1);
                     ">
                         <div style="font-size: 0.9rem; opacity: 0.9; margin-bottom: 15px;">
-                            Gere um relatório completo com todos os rendimentos, despesas fixas, despesas variáveis e balanço do ano.
+                            ${t('gerarRelatorio')}
                         </div>
                         
                         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                             <div style="flex: 1; min-width: 200px;">
                                 <label style="display: block; font-size: 0.85rem; opacity: 0.8; margin-bottom: 5px;">
-                                    📅 Selecione o Ano:
+                                    ${t('selecioneAno')}
                                 </label>
                                 <select 
                                     id="reportYearSelect"
@@ -4118,7 +4719,7 @@
                                 onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(0,212,170,0.35)'"
                                 onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(102, 126, 234, 0.4)'"
                             >
-                                📥 Gerar Relatório PDF
+                                ${t('gerarRelatorio2')}
                             </button>
                         </div>
                         
@@ -4130,7 +4731,7 @@
                             border-left: 3px solid #3b82f6;
                         ">
                             <div style="font-size: 0.8rem; opacity: 0.9;">
-                                💡 <strong>Dica:</strong> O relatório incluirá todas as despesas fixas e variáveis do ano selecionado, organizadas por mês e categoria.
+                                ${t('dica')} ${t('dicaRelatorio')}
                             </div>
                         </div>
                     </div>
@@ -4173,7 +4774,7 @@
                     if (catAnnualTotals.length === 0) {
                         return `
                             <div class="card" style="margin-top: 20px;">
-                                <h3 style="margin-bottom: 10px;">📈 Evolução de Despesas ${currentYear}</h3>
+                                <h3 style="margin-bottom: 10px;">${t('evolucaoDespesas')} ${currentYear}</h3>
                                 <div style="text-align:center; opacity:0.6; padding: 40px 0; font-size:0.9rem;">
                                     Nenhuma despesa registrada em ${currentYear}
                                 </div>
@@ -4266,8 +4867,8 @@
                     return `
                         <div class="card" style="margin-top: 20px;">
                             <h3 style="margin-bottom: 16px; display:flex; align-items:center; gap:8px;">
-                                📈 Evolução de Despesas ${currentYear}
-                                <span style="font-size:0.75rem; font-weight:400; opacity:0.65;">Top 6 categorias · ${nActive} ${nActive===1?'mês':'meses'} com despesas</span>
+                                ${t('evolucaoDespesas')} ${currentYear}
+                                <span style="font-size:0.75rem; font-weight:400; opacity:0.65;">${t('topCategorias')} · ${nActive} ${nActive===1 ? t('mesComDespesas') : t('mesesComDespesas')}</span>
                             </h3>
                             <div style="overflow-x: auto;">
                                 <svg width="100%" viewBox="0 0 ${W} ${H}"
@@ -4306,7 +4907,7 @@
             
             // Limite diário
             // Se é o último dia do mês, pode gastar TODO o restante
-            // Se não, divide pelos dias restantes
+            // Se não, divide pelos ${t('diasRestantes')}
             const dailyLimit = monthDays.isLastDay ? remaining : (monthDays.remaining > 0 ? remaining / monthDays.remaining : 0);
             const todayRemaining = dailyLimit - todayTotal;
             const todayPercent = dailyLimit > 0 ? (todayTotal / dailyLimit) * 100 : 0;
@@ -4327,11 +4928,11 @@
 
             app.innerHTML = `
                 <div class="tabs">
-                    <button class="tab" onclick="state.tab='dash'; render()">Dashboard</button>
-                    <button class="tab active" onclick="state.tab='add'; render()">Variável</button>
-                    <button class="tab" onclick="state.tab='fixed'; render()">Fixas</button>
-                    <button class="tab" onclick="state.tab='categories'; render()">Categorias</button>
-                    <button class="tab" onclick="state.tab='list'; render()">Histórico</button>
+                    <button class="tab" onclick="state.tab='dash'; render()">${t('dashboard')}</button>
+                    <button class="tab active" onclick="state.tab='add'; render()">${t('variavel')}</button>
+                    <button class="tab" onclick="state.tab='fixed'; render()">${t('fixas')}</button>
+                    <button class="tab" onclick="state.tab='categories'; render()">${t('categorias')}</button>
+                    <button class="tab" onclick="state.tab='list'; render()">${t('historico')}</button>
                 </div>
                 <div class="card">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
@@ -4348,11 +4949,11 @@
                                 </svg>
                                 <div class="gauge-text">
                                     <div class="gauge-percent" style="font-size: 2rem;">${Math.min(percent, 100).toFixed(0)}%</div>
-                                    <div class="gauge-label" style="font-size: 0.7rem;">do limite</div>
+                                    <div class="gauge-label" style="font-size: 0.7rem;">${t('doLimite').toLowerCase()}</div>
                                 </div>
                             </div>
                             <div style="text-align: center; font-size: 0.75rem; opacity: 0.8; margin-top: 8px;">
-                                📅 Limite Mensal
+                                📅 ${t('limiteMensalLabel')}
                             </div>
                         </div>
                         
@@ -4369,47 +4970,50 @@
                                 </svg>
                                 <div class="gauge-text">
                                     <div class="gauge-percent" style="font-size: 2rem;">${Math.min(todayPercent, 100).toFixed(0)}%</div>
-                                    <div class="gauge-label" style="font-size: 0.7rem;">de hoje</div>
+                                    <div class="gauge-label" style="font-size: 0.7rem;">${t('deHoje').toLowerCase()}</div>
                                 </div>
                             </div>
                             <div style="text-align: center; font-size: 0.75rem; opacity: 0.8; margin-top: 8px;">
-                                📆 Limite Diário
+                                📆 ${t('limiteDiario')}
                             </div>
                         </div>
                     </div>
                     
                     <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; text-align: center;">
                         <div style="min-width: 0;">
-                            <div style="font-size: 0.7rem; opacity: 0.7; margin-bottom: 4px;">Limite</div>
+                            <div style="font-size: 0.7rem; opacity: 0.7; margin-bottom: 4px;">${t('limiteLabel')}</div>
                             <div style="font-size: 1.05rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${formatNumberShort(state.goal)}</div>
                         </div>
                         <div style="min-width: 0;">
-                            <div style="font-size: 0.7rem; opacity: 0.7; margin-bottom: 4px;">Gasto</div>
+                            <div style="font-size: 0.7rem; opacity: 0.7; margin-bottom: 4px;">${t('gastoLabel')}</div>
                             <div style="font-size: 1.05rem; font-weight: 700; color: ${percent > 90 ? '#fca5a5' : '#fff'}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${formatNumberShort(total)}</div>
                             <div style="font-size: 0.6rem; opacity: 0.7; margin-top: 2px; color: #fbbf24; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                                 ${monthDays.passed > 0 ? `💸 ${formatNumberShort(total / monthDays.passed)}/d` : '💸 0/d'}
                             </div>
                             <div style="font-size: 0.55rem; opacity: 0.55; margin-top: 1px; white-space: nowrap;">
-                                ${monthDays.passed} dia${monthDays.passed !== 1 ? 's' : ''} passado${monthDays.passed !== 1 ? 's' : ''}
+                                ${monthDays.passed} ${monthDays.passed !== 1 ? t('diasPassados') : t('diaPassado')}
                             </div>
                         </div>
                         <div style="min-width: 0;">
-                            <div style="font-size: 0.7rem; opacity: 0.7; margin-bottom: 4px;">Restante</div>
+                            <div style="font-size: 0.7rem; opacity: 0.7; margin-bottom: 4px;">${t('restante')}</div>
                             <div style="font-size: 1.05rem; font-weight: 700; color: ${remaining < 0 ? '#fca5a5' : '#86efac'}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${formatNumberShort(remaining)}</div>
                             <div style="font-size: 0.6rem; opacity: 0.7; margin-top: 2px; color: ${remaining < 0 ? '#fca5a5' : '#86efac'}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                ${monthDays.isLastDay ? '💰 Tudo hoje' : (monthDays.remaining > 0 ? `💰 ${formatNumberShort(dailyLimit)}/d` : '💰 0/d')}
+                                ${monthDays.isLastDay ? (state.lang==='en'?'💰 All today':'💰 Tudo hoje') : (monthDays.remaining > 0 ? `💰 ${formatNumberShort(dailyLimit)}/d` : '💰 0/d')}
                             </div>
                             <div style="font-size: 0.55rem; opacity: 0.55; margin-top: 1px; white-space: nowrap;">
-                                ${monthDays.isLastDay ? 'Último dia!' : `${monthDays.remaining} dia${monthDays.remaining !== 1 ? 's' : ''} restante${monthDays.remaining !== 1 ? 's' : ''}`}
+                                ${monthDays.isLastDay ? (state.lang==='en'?'Last day!':'Último dia!') : monthDays.remaining + ' ' + (monthDays.remaining !== 1 ? t('diasRestantes') : t('diaRestante'))}
                             </div>
                         </div>
                         <div style="min-width: 0;">
-                            <div style="font-size: 0.7rem; opacity: 0.7; margin-bottom: 4px;">Hoje</div>
+                            <div style="font-size: 0.7rem; opacity: 0.7; margin-bottom: 4px;">${t('hoje')}</div>
                             <div style="font-size: 1.05rem; font-weight: 700; color: ${remaining < 0 ? '#fca5a5' : '#86efac'}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                                 ${monthDays.isLastDay ? formatNumberShort(Math.max(0, remaining)) : formatNumberShort(Math.max(0, todayRemaining))}
                             </div>
                             <div style="font-size: 0.6rem; opacity: 0.7; margin-top: 2px; color: #fbbf24; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                                 💸 ${formatNumberShort(todayTotal)}
+                            </div>
+                            <div style="font-size: 0.6rem; opacity: 0.7; margin-top: 2px;">
+                                ${t('gastoLabel').toLowerCase()}
                             </div>
                         </div>
                     </div>
@@ -4418,7 +5022,7 @@
                     <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1);">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                             <div style="font-size: 0.85rem; opacity: 0.9;">
-                                🌡️ Ritmo: <strong style="color: ${ritmo.cor}">${ritmo.ritmo.toFixed(1)}%</strong>
+                                🌡️ ${t('ritmoLabel')}: <strong style="color: ${ritmo.cor}">${ritmo.ritmo.toFixed(1)}%</strong>
                             </div>
                             <div style="font-size: 0.75rem; opacity: 0.8;">
                                 ${ritmo.emoji} ${ritmo.status}
@@ -4439,7 +5043,7 @@
                 </div>
                 <div class="card">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                        <label class="label" style="margin: 0;">${state.manualEntry ? '✏️ Inserção Manual' : '📱 Inserção via SMS'}</label>
+                        <label class="label" style="margin: 0;">${state.manualEntry ? t('inserirManual') : t('inserirViaSMS')}</label>
                         <button 
                             onclick="toggleManualEntry()"
                             style="
@@ -4453,14 +5057,14 @@
                                 transition: 0.3s;
                             "
                         >
-                            ${state.manualEntry ? '📱 SMS' : '✏️ Manual'}
+                            ${state.manualEntry ? '📱 SMS' : '✏️ ' + t('manual')}
                         </button>
                     </div>
                     
                     ${!state.manualEntry ? `
                         <div class="input-group">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                                <label class="label" style="margin: 0;">Cole o SMS do banco:</label>
+                                <label class="label" style="margin: 0;">${t('coleOSMS')}</label>
                                 <button 
                                     onclick="pasteFromClipboard()"
                                     style="
@@ -4479,10 +5083,10 @@
                                     onmouseover="this.style.background='rgba(0,212,170,0.15)'; this.style.color='#00D4AA';"
                                     onmouseout="this.style.background='rgba(255,255,255,0.05)'; this.style.color='rgba(255,255,255,0.5)';"
                                 >
-                                    📋 Colar
+                                    📋 ${t('colar')}
                                 </button>
                             </div>
-                            <textarea id="smsInput" placeholder="Cole aqui o SMS..." oninput="state.sms=this.value">${state.sms}</textarea>
+                            <textarea id="smsInput" placeholder="${t('smsPlaceholder')}" oninput="state.sms=this.value">${state.sms}</textarea>
                             <div style="font-size:0.8rem; opacity:0.7; margin-top:8px;">
                             <div style="font-size:0.8rem; opacity:0.7; margin-top:8px;">
                                 Exemplo: Purchase of AED 716.55 with Credit Card ending xxxx at e& Digital App, Abu Dhabi. Avl Cr.......
@@ -4491,34 +5095,34 @@
                         </div>
                     ` : `
                         <div class="input-group">
-                            <label class="label">Estabelecimento:</label>
+                            <label class="label">${t('estabelecimento')}:</label>
                             <input type="text" id="manualMerchant" class="input-field" placeholder="Ex: Carrefour, Subway..." />
                         </div>
                         
                         <div class="input-group">
-                            <label class="label">${state.currency || 'AED'} — Valor:</label>
+                            <label class="label">${t('valor')} (${state.currency || 'AED'}):</label>
                             <input type="number" id="manualAmount" class="input-field" placeholder="Ex: 150.50" step="0.01" />
                         </div>
                         
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                             <div class="input-group">
-                                <label class="label">Data:</label>
+                                <label class="label">${t('data')}:</label>
                                 <input type="date" id="manualDate" class="input-field" />
                             </div>
                             <div class="input-group">
-                                <label class="label">Hora:</label>
+                                <label class="label">${t('hora')}:</label>
                                 <input type="time" id="manualTime" class="input-field" />
                             </div>
                         </div>
                     `}
                     
                     <div class="input-group">
-                        <label class="label">Observação (opcional):</label>
-                        <input type="text" id="obsInput" class="input-field" placeholder="Ex: Presente, Dividido com amigos..." value="${state.obs}" oninput="state.obs=this.value">
+                        <label class="label">${t('observacaoLabel')}</label>
+                        <input type="text" id="obsInput" class="input-field" placeholder="${t('exPlaceholder')}" value="${state.obs}" oninput="state.obs=this.value">
                     </div>
                     
                     <div class="input-group">
-                        <label class="label">Selecione a categoria:</label>
+                        <label class="label">${t('selecioneCatLabel')}</label>
                         <div class="category-list">
                             ${CATEGORIES.map(cat => `
                                 <div class="category-item ${state.selectedCategory === cat.id ? 'selected' : ''}" 
@@ -4531,7 +5135,7 @@
                     </div>
                     
                     <button class="btn btn-add-expense" onclick="${state.manualEntry ? 'addManualExpense()' : 'addExpense()'}">
-                        ${state.manualEntry ? '✅ Adicionar Manualmente' : '📱 Extrair e Adicionar'}
+                        ${state.manualEntry ? '✅ ' + t('adicionarManualmente') : '📱 ' + t('extrairAdicionar')}
                     </button>
                 </div>
                 
@@ -4546,17 +5150,17 @@
 
                     let html = '<div style="margin-top: 16px; padding: 20px; background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.15); border-radius: 12px; border-left: 3px solid #22c55e;">';
                     html += '<div style="font-size: 1rem; font-weight: 600; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between;">';
-                    html += '<span style="color: #F0F4FF;">💰 Rendimento Mensal</span>';
-                    html += '<button onclick="toggleIncomeManager()" style="padding: 8px 14px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #94A3B8; font-weight: 600; cursor: pointer; font-size: 0.8rem;">📋 Gerir Todos</button>';
+                    html += '<span style="color: #F0F4FF;">' + t('rendimentoMensal') + '</span>';
+                    html += '<button onclick="toggleIncomeManager()" style="padding: 8px 14px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #94A3B8; font-weight: 600; cursor: pointer; font-size: 0.8rem;">' + t('gerirTodos') + '</button>';
                     html += '</div>';
                     html += '<label style="display: block; font-size: 0.78rem; color: #94A3B8; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em;">';
-                    html += 'Rendimento de ' + monthNames[now.getMonth()] + ' ' + now.getFullYear();
+                    html += t('rendimentoMensal').replace('💰 ','') + ' ' + monthNames[now.getMonth()] + ' ' + now.getFullYear();
                     html += '</label>';
                     html += '<div style="display: flex; gap: 8px; align-items: center;">';
                     html += '<input type="number" id="monthlyIncomeInput" placeholder="Ex: 20000" ';
                     html += 'value="' + (currentIncome || '') + '" ';
                     html += 'style="flex: 1; padding: 11px 14px; border: 1px solid rgba(34,197,94,0.2); border-radius: 8px; background: rgba(255,255,255,0.05); color: #F0F4FF; font-size: 1rem; font-weight: 600; font-family: inherit;" />';
-                    html += '<button onclick="saveMonthlyIncome()" style="padding: 11px 18px; background: #22c55e; border: none; border-radius: 8px; color: #080D1A; font-weight: 700; cursor: pointer; white-space: nowrap; font-size: 0.85rem;">💾 Salvar</button>';
+                    html += '<button onclick="saveMonthlyIncome()" style="padding: 11px 18px; background: #22c55e; border: none; border-radius: 8px; color: #080D1A; font-weight: 700; cursor: pointer; white-space: nowrap; font-size: 0.85rem;">'+t('salvarFixa')+'</button>';
                     html += '</div>';
 
                     if (currentIncome > 0) {
@@ -4566,14 +5170,14 @@
                         const economy = currentIncome - totalWithFixed;
                         const spentPercent = (totalWithFixed / currentIncome * 100);
                         let statusColor, statusIcon, statusText;
-                        if (spentPercent < 100) { statusColor = '#22c55e'; statusIcon = '🎉'; statusText = 'Guardou ' + (100 - spentPercent).toFixed(1) + '% do rendimento'; }
-                        else if (spentPercent === 100) { statusColor = '#f59e0b'; statusIcon = '⚠️'; statusText = 'Gastou exactamente 100% do rendimento'; }
+                        if (spentPercent < 100) { statusColor = '#22c55e'; statusIcon = '🎉'; statusText = t('guardouTooltip') + ' ' + (100 - spentPercent).toFixed(1) + '% ' + t('doSeuRendimento'); }
+                        else if (spentPercent === 100) { statusColor = '#f59e0b'; statusIcon = '⚠️'; statusText = t('gastaExactamente'); }
                         else { statusColor = '#ef4444'; statusIcon = '🚨'; statusText = (state.currency || 'AED') + ' ' + Math.abs(economy).toFixed(0) + ' a mais (' + spentPercent.toFixed(1) + '%)'; }
                         html += '<div style="margin-top: 12px; padding: 12px; background: rgba(255,255,255,0.04); border-radius: 8px;">';
                         html += '<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; font-size: 0.82rem; margin-bottom: 10px;">';
-                        html += '<div><div style="color: #94A3B8; margin-bottom: 2px;">💰 Rendimento</div><div style="font-weight: 700; color: #22c55e; font-variant-numeric: tabular-nums;">' + (state.currency || 'AED') + ' ' + currentIncome.toFixed(0) + '</div></div>';
-                        html += '<div><div style="color: #94A3B8; margin-bottom: 2px;">💸 Variáveis</div><div style="font-weight: 700; color: #ef4444; font-variant-numeric: tabular-nums;">' + (state.currency || 'AED') + ' ' + total.toFixed(0) + '</div></div>';
-                        html += '<div><div style="color: #94A3B8; margin-bottom: 2px;">🔒 Fixas</div><div style="font-weight: 700; color: #f59e0b; font-variant-numeric: tabular-nums;">' + (state.currency || 'AED') + ' ' + fixedTotal.toFixed(0) + '</div></div>';
+                        html += '<div><div style="color: #94A3B8; margin-bottom: 2px;">'+t('rendimentoLabel')+'</div><div style="font-weight: 700; color: #22c55e; font-variant-numeric: tabular-nums;">' + (state.currency || 'AED') + ' ' + currentIncome.toFixed(0) + '</div></div>';
+                        html += '<div><div style="color: #94A3B8; margin-bottom: 2px;">'+t('variaveis')+'</div><div style="font-weight: 700; color: #ef4444; font-variant-numeric: tabular-nums;">' + (state.currency || 'AED') + ' ' + total.toFixed(0) + '</div></div>';
+                        html += '<div><div style="color: #94A3B8; margin-bottom: 2px;">'+t('fixasLabel2')+'</div><div style="font-weight: 700; color: #f59e0b; font-variant-numeric: tabular-nums;">' + (state.currency || 'AED') + ' ' + fixedTotal.toFixed(0) + '</div></div>';
                         html += '</div>';
                         html += '<div style="padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.07); display: flex; justify-content: space-between; align-items: center;">';
                         html += '<div style="font-size: 0.8rem; color: #94A3B8;">' + statusIcon + ' ' + statusText + '</div>';
@@ -4657,7 +5261,7 @@
             const totalFixed = currentMonthFixed.reduce((sum, f) => sum + (parseFloat(f.amount) || 0), 0);
             
             // Nomes dos meses
-            const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+            const monthNames = t('monthNames');
             
             // Calcular mês anterior (com validação)
             let currentMonthNum, currentYearNum, previousMonthNum, previousYearNum, previousMonth, hasPreviousMonth;
@@ -4683,18 +5287,18 @@
             
             app.innerHTML = `
                 <div class="tabs">
-                    <button class="tab" onclick="state.tab='dash'; render()">Dashboard</button>
-                    <button class="tab" onclick="state.tab='add'; render()">Variável</button>
-                    <button class="tab active" onclick="state.tab='fixed'; render()">Fixas</button>
-                    <button class="tab" onclick="state.tab='categories'; render()">Categorias</button>
-                    <button class="tab" onclick="state.tab='list'; render()">Histórico</button>
+                    <button class="tab" onclick="state.tab='dash'; render()">${t('dashboard')}</button>
+                    <button class="tab" onclick="state.tab='add'; render()">${t('variavel')}</button>
+                    <button class="tab active" onclick="state.tab='fixed'; render()">${t('fixas')}</button>
+                    <button class="tab" onclick="state.tab='categories'; render()">${t('categorias')}</button>
+                    <button class="tab" onclick="state.tab='list'; render()">${t('historico')}</button>
                 </div>
                 
                 <!-- Seletor de Mês -->
                 <div class="card" style="padding: 15px;">
                     <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                         <div style="flex: 1; min-width: 200px;">
-                            <label style="display: block; font-size: 0.85rem; opacity: 0.8; margin-bottom: 5px;">📅 Selecione o Mês:</label>
+                            <label style="display: block; font-size: 0.85rem; opacity: 0.8; margin-bottom: 5px;">${t('selecioneMes')}</label>
                             <select 
                                 style="width: 100%; padding: 10px; background: #162035; border: 1px solid rgba(0,212,170,0.3); border-radius: 8px; font-size: 1rem; color: #F0F4FF; font-weight: 600;"
                                 onchange="state.selectedFixedMonth = this.value; loadMonthlyFixed(this.value);"
@@ -4715,7 +5319,7 @@
                                 class="btn"
                                 style="background: rgba(139,92,246,0.8); padding: 10px 20px; white-space: nowrap;"
                             >
-                                📋 Copiar do Mês Anterior
+                                ${t('copiarMesAnteriorBtn')}
                             </button>
                         ` : ''}
                     </div>
@@ -4723,26 +5327,26 @@
                 
                 <!-- Formulário de Adicionar/Editar -->
                 <div class="card">
-                    <h3 style="margin-bottom: 20px;">💳 ${state.editingFixed ? 'Editar' : 'Nova'} Despesa Fixa - ${monthNames[currentMonthNum - 1]} ${currentYearNum}</h3>
+                    <h3 style="margin-bottom: 20px;">💳 ${state.editingFixed ? t('editarFixa') : t('novaFixa')} ${t('despesaFixaTitulo')} - ${monthNames[currentMonthNum - 1]} ${currentYearNum}</h3>
                     
                     <div class="input-group">
-                        <label class="label">Nome da despesa:</label>
+                        <label class="label">${t('nomeDaDespesa')}:</label>
                         <input type="text" id="fixedName" class="input-field" placeholder="Ex: Aluguel, Internet, Netflix..." />
                     </div>
                     
                     <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 15px;">
                         <div class="input-group">
-                            <label class="label">${state.currency || 'AED'} — Valor:</label>
+                            <label class="label">${t('valor')} (${state.currency || 'AED'}):</label>
                             <input type="number" id="fixedAmount" class="input-field" placeholder="Ex: 150.00" step="0.01" />
                         </div>
                         <div class="input-group">
-                            <label class="label">Dia do mês:</label>
+                            <label class="label">${t('diaMes')}:</label>
                             <input type="number" id="fixedDay" class="input-field" placeholder="1-31" min="1" max="31" />
                         </div>
                     </div>
                     
                     <div class="input-group">
-                        <label class="label">Categoria:</label>
+                        <label class="label">${t('categoriaLabel')}:</label>
                         <div class="category-grid">
                             ${CATEGORIES.map(cat => `
                                 <div 
@@ -4759,37 +5363,37 @@
                     
                     ${state.editingFixed ? `
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px;">
-                            <button class="btn" onclick="saveMonthlyFixedExpense()" style="background: #22c55e;">💾 Salvar</button>
-                            <button class="btn" onclick="cancelEditFixed()" style="background: #6b7280;">❌ Cancelar</button>
+                            <button class="btn" onclick="saveMonthlyFixedExpense()" style="background: #22c55e;">${t('salvarFixa')}</button>
+                            <button class="btn" onclick="cancelEditFixed()" style="background: #6b7280;">${t('cancelar')}</button>
                         </div>
                     ` : `
-                        <button id="addFixedBtn" class="btn" onclick="addMonthlyFixedExpense()" style="margin-top: 15px;">➕ Adicionar Despesa Fixa</button>
+                        <button id="addFixedBtn" class="btn" onclick="addMonthlyFixedExpense()" style="margin-top: 15px;">${t('adicionarFixaBtn')}</button>
                     `}
                 </div>
                 
                 <!-- Lista de Despesas Fixas do Mês -->
                 <div class="card">
-                    <h3 style="margin-bottom: 15px;">📋 Despesas Fixas - ${monthNames[currentMonthNum - 1]} ${currentYearNum}</h3>
+                    <h3 style="margin-bottom: 15px;">📋 ${t('fixasListTitle')} - ${monthNames[currentMonthNum - 1]} ${currentYearNum}</h3>
                     
                     ${currentMonthFixed.length === 0 ? `
                         <div class="empty" style="padding: 40px 20px;">
                             📭<br>
-                            <div style="font-size: 1rem; margin-top: 10px;">Nenhuma despesa fixa cadastrada neste mês</div>
+                            <div style="font-size: 1rem; margin-top: 10px;">${t('nenhumaFixaCadastrada')}</div>
                             ${hasPreviousMonth ? `
                                 <button 
                                     onclick="copyFromPrevMonth()"
                                     class="btn"
                                     style="margin-top: 15px; background: rgba(139,92,246,0.8);"
                                 >
-                                    📋 Copiar do Mês Anterior
+                                    ${t('copiarMesAnteriorBtn')}
                                 </button>
                             ` : ''}
                         </div>
                     ` : `
                         <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; margin-bottom: 15px;">
-                            <div style="font-size: 0.85rem; opacity: 0.8; margin-bottom: 5px;">Total de Despesas Fixas</div>
+                            <div style="font-size: 0.85rem; opacity: 0.8; margin-bottom: 5px;">${t('totalDespesasFixas')}</div>
                             <div style="font-size: 2rem; font-weight: 700; color: #f59e0b;">${state.currency || 'AED'} ${totalFixed.toFixed(2)}</div>
-                            <div style="font-size: 0.85rem; opacity: 0.7; margin-top: 5px;">${currentMonthFixed.length} despesa${currentMonthFixed.length !== 1 ? 's' : ''}</div>
+                            <div style="font-size: 0.85rem; opacity: 0.7; margin-top: 5px;">${currentMonthFixed.length} ${currentMonthFixed.length !== 1 ? t('despesasCount') : t('despesaCount')}</div>
                         </div>
                         
                         <div style="display: flex; flex-direction: column; gap: 10px;">
@@ -4937,15 +5541,15 @@
                 .sort((a, b) => b.total - a.total);
             
             const maxTotal = sortedStats.length > 0 ? sortedStats[0].total : 1;
-            const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+            const monthNames = t('monthNames');
 
             app.innerHTML = `
                 <div class="tabs">
-                    <button class="tab" onclick="state.tab='dash'; render()">Dashboard</button>
-                    <button class="tab" onclick="state.tab='add'; render()">Variável</button>
-                    <button class="tab" onclick="state.tab='fixed'; render()">Fixas</button>
-                    <button class="tab active" onclick="state.tab='categories'; render()">Categorias</button>
-                    <button class="tab" onclick="state.tab='list'; render()">Histórico</button>
+                    <button class="tab" onclick="state.tab='dash'; render()">${t('dashboard')}</button>
+                    <button class="tab" onclick="state.tab='add'; render()">${t('variavel')}</button>
+                    <button class="tab" onclick="state.tab='fixed'; render()">${t('fixas')}</button>
+                    <button class="tab active" onclick="state.tab='categories'; render()">${t('categorias')}</button>
+                    <button class="tab" onclick="state.tab='list'; render()">${t('historico')}</button>
                 </div>
                 
                 <!-- Título da Seção -->
@@ -4960,7 +5564,7 @@
                         color: white;
                         opacity: 0.95;
                     ">
-                        💸 Despesas Variáveis por Categoria
+                        ${t('despesasVariaveisCat')}
                     </h2>
                 </div>
                 
@@ -4984,10 +5588,10 @@
                                     statusTooltip = `Gastou acima do limite\\nExcedeu em ${state.currency || 'AED'} ${Math.abs(remaining).toFixed(2)} (${percentOfGoal.toFixed(1)}%)`;
                                 } else if (monthTotal > state.goal * 0.9) {
                                     statusIcon = '🟡';
-                                    statusTooltip = `Gastou próximo do limite\\nFaltam ${state.currency || 'AED'} ${remaining.toFixed(2)} (${percentOfGoal.toFixed(1)}%)`;
+                                    statusTooltip = t('gastouProximo') + '\n' + t('faltam') + ' ' + (state.currency || 'AED') + ' ' + remaining.toFixed(2) + ' (' + percentOfGoal.toFixed(1) + '%)';
                                 } else {
                                     statusIcon = '🟢';
-                                    statusTooltip = `Gastou abaixo do limite\\nDisponível ${state.currency || 'AED'} ${remaining.toFixed(2)} (${percentOfGoal.toFixed(1)}%)`;
+                                    statusTooltip = t('gastouAbaixo') + '\n' + t('disponivel') + ' ' + (state.currency || 'AED') + ' ' + remaining.toFixed(2) + ' (' + percentOfGoal.toFixed(1) + '%)';
                                 }
                                 
                                 return `
@@ -5011,7 +5615,7 @@
                                     >
                                         <div>${statusIcon} ${monthNames[month - 1]} ${year}</div>
                                         <div style="font-size: 0.7rem; opacity: 0.8; margin-top: 3px;">
-                                            ${isCurrent ? 'Atual • ' : ''}${state.currency || 'AED'} ${monthTotal.toFixed(0)}
+                                            ${isCurrent ? t('atual') + ' • ' : ''}${state.currency || 'AED'} ${monthTotal.toFixed(0)}
                                         </div>
                                     </button>
                                 `;
@@ -5022,7 +5626,7 @@
                 
                 <div class="card">
                     <h3 style="margin-bottom: 20px;">
-                        📊 Gastos por Categoria
+                        ${t('gastosPorCat')}
                         ${selectedMonth ? (() => {
                             const [m, y] = selectedMonth.split('/').map(Number);
                             return `<span style="font-size: 0.85rem; opacity: 0.8; font-weight: 400;"> - ${monthNames[m - 1]} ${y}</span>`;
@@ -5057,7 +5661,7 @@
                 <!-- Gráfico de Pizza - Total Geral -->
                 <div class="card">
                     <h3 style="margin-bottom: 20px;">
-                        🍕 Distribuição por Categoria
+                        ${t('distribuicaoCat')}
                         ${selectedMonth ? (() => {
                             const [m, y] = selectedMonth.split('/').map(Number);
                             return `<span style="font-size: 0.85rem; opacity: 0.8; font-weight: 400;"> - ${monthNames[m - 1]} ${y}</span>`;
@@ -5101,7 +5705,7 @@
                             .sort((a, b) => b.total - a.total);
                         
                         if (allSortedStats.length === 0) {
-                            return '<div class="empty">📦<br>Nenhuma despesa ainda</div>';
+                            return '<div class="empty">📦<br>' + t('nenhumaDespesaAinda') + '</div>';
                         }
                         
                         const grandTotal = allSortedStats.reduce((sum, s) => sum + s.total, 0);
@@ -5193,9 +5797,9 @@
                                 
                                 <!-- Resumo -->
                                 <div style="width: 100%; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 12px; text-align: center;">
-                                    <div style="font-size: 0.8rem; opacity: 0.8; margin-bottom: 5px;">Total Geral de Despesas Variáveis</div>
+                                    <div style="font-size: 0.8rem; opacity: 0.8; margin-bottom: 5px;">${t('totalGeralVariaveis')}</div>
                                     <div style="font-size: 1.5rem; font-weight: 700;">${state.currency || 'AED'} ${grandTotal.toFixed(2)}</div>
-                                    <div style="font-size: 0.75rem; opacity: 0.7; margin-top: 5px;">${state.expenses.length} transações</div>
+                                    <div style="font-size: 0.75rem; opacity: 0.7; margin-top: 5px;">${state.expenses.length} ${t('transacoesLabel')}</div>
                                 </div>
                             </div>
                         `;
@@ -5244,7 +5848,7 @@
                                                 <div class="expense-item" style="margin-bottom: 10px;">
                                                     <div class="expense-info">
                                                         <div class="expense-merchant">${merchant}</div>
-                                                        <div class="expense-date">${date} às ${time}</div>
+                                                        <div class="expense-date">${date} ${t('as')} ${time}</div>
                                                         ${obs ? `<div class="expense-date" style="font-style: italic; margin-top: 4px;">💬 ${obs}</div>` : ''}
                                                     </div>
                                                     <div style="display:flex; align-items:center;">
@@ -5327,32 +5931,32 @@
                 return monthB - monthA;
             });
 
-            const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+            const monthNames = t('monthNames');
 
             app.innerHTML = `
                 <div class="tabs">
-                    <button class="tab" onclick="state.tab='dash'; render()">Dashboard</button>
-                    <button class="tab" onclick="state.tab='add'; render()">Variável</button>
-                    <button class="tab" onclick="state.tab='fixed'; render()">Fixas</button>
-                    <button class="tab" onclick="state.tab='categories'; render()">Categorias</button>
-                    <button class="tab active" onclick="state.tab='list'; render()">Histórico</button>
+                    <button class="tab" onclick="state.tab='dash'; render()">${t('dashboard')}</button>
+                    <button class="tab" onclick="state.tab='add'; render()">${t('variavel')}</button>
+                    <button class="tab" onclick="state.tab='fixed'; render()">${t('fixas')}</button>
+                    <button class="tab" onclick="state.tab='categories'; render()">${t('categorias')}</button>
+                    <button class="tab active" onclick="state.tab='list'; render()">${t('historico')}</button>
                 </div>
                 ${state.expenses.length === 0 ? 
-                    '<div class="card"><div class="empty">📊<br>Nenhuma despesa ainda</div></div>' :
+                    '<div class="card"><div class="empty">📊<br>' + t('nenhumaDespesaAinda') + '</div></div>' :
                     `<!-- Card de Filtro de Período -->
                     <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 16px; position: relative; overflow: hidden;">
                         <div style="position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px; background: var(--amber); border-radius: 0 3px 3px 0; opacity: 0.7;"></div>
-                        <div style="font-size: 0.72rem; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px;">📅 Filtrar por Período</div>
+                        <div style="font-size: 0.72rem; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px;">${t('filtrarPeriodo')}</div>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
                             <div>
-                                <label style="font-size: 0.72rem; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 5px;">De</label>
+                                <label style="font-size: 0.72rem; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 5px;">${t('de')}</label>
                                 <input type="date" id="histDateStart"
                                     value="${state.histDateStart}"
                                     onchange="state.histDateStart = this.value; render();"
                                     style="width: 100%; padding: 9px 10px; background: var(--surface-2); border: 1px solid var(--border-2); border-radius: var(--radius-sm); color: var(--text-1); font-size: 0.85rem; font-family: inherit; color-scheme: dark;">
                             </div>
                             <div>
-                                <label style="font-size: 0.72rem; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 5px;">Até</label>
+                                <label style="font-size: 0.72rem; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 5px;">${t('ate')}</label>
                                 <input type="date" id="histDateEnd"
                                     value="${state.histDateEnd}"
                                     onchange="state.histDateEnd = this.value; render();"
@@ -5366,31 +5970,31 @@
                                 state.histDateStart = s(n); state.histDateEnd = s(n); render();"
                                 style="flex: 1; min-width: 60px; padding: 7px 4px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-2); font-size: 0.7rem; cursor: pointer; transition: all 0.2s;"
                                 onmouseover="this.style.borderColor='var(--teal)'; this.style.color='var(--teal)';"
-                                onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--text-2)';">Hoje</button>
+                                onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--text-2)';">${t('hoje')}</button>
                             <button onclick="
                                 const n = new Date(); const s = d => d.toISOString().split('T')[0];
                                 const day = n.getDay(); const mon = new Date(n); mon.setDate(n.getDate() - (day === 0 ? 6 : day - 1));
                                 state.histDateStart = s(mon); state.histDateEnd = s(n); render();"
                                 style="flex: 1; min-width: 60px; padding: 7px 4px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-2); font-size: 0.7rem; cursor: pointer; transition: all 0.2s;"
                                 onmouseover="this.style.borderColor='var(--teal)'; this.style.color='var(--teal)';"
-                                onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--text-2)';">Semana</button>
+                                onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--text-2)';">${t('semana')}</button>
                             <button onclick="
                                 const n = new Date(); const s = d => d.toISOString().split('T')[0];
                                 const first = new Date(n.getFullYear(), n.getMonth(), 1);
                                 state.histDateStart = s(first); state.histDateEnd = s(n); render();"
                                 style="flex: 1; min-width: 60px; padding: 7px 4px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-2); font-size: 0.7rem; cursor: pointer; transition: all 0.2s;"
                                 onmouseover="this.style.borderColor='var(--teal)'; this.style.color='var(--teal)';"
-                                onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--text-2)';">Mês</button>
+                                onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--text-2)';">${t('mes')}</button>
                             <button onclick="
                                 const n = new Date(); const s = d => d.toISOString().split('T')[0];
                                 state.histDateStart = n.getFullYear() + '-01-01'; state.histDateEnd = s(n); render();"
                                 style="flex: 1; min-width: 60px; padding: 7px 4px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-2); font-size: 0.7rem; cursor: pointer; transition: all 0.2s;"
                                 onmouseover="this.style.borderColor='var(--teal)'; this.style.color='var(--teal)';"
-                                onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--text-2)';">Ano</button>
+                                onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--text-2)';">${t('ano')}</button>
                             <button onclick="state.histDateStart = ''; state.histDateEnd = ''; render();"
                                 style="flex: 1; min-width: 60px; padding: 7px 4px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-2); font-size: 0.7rem; cursor: pointer; transition: all 0.2s;"
                                 onmouseover="this.style.borderColor='#ef4444'; this.style.color='#ef4444';"
-                                onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--text-2)';">Limpar</button>
+                                onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--text-2)';">${t('limpar')}</button>
                         </div>
                     </div>
 
@@ -5399,8 +6003,8 @@
 
                     ${(state.histDateStart || state.histDateEnd) ? '' :
                     '<div class="expand-controls">' +
-                        '<button onclick="expandAllMonths()">📂 Expandir Todos</button>' +
-                        '<button onclick="collapseAllMonths()">📁 Colapsar Todos</button>' +
+                        '<button onclick="expandAllMonths()">' + t('expandirTodos') + '</button>' +
+                        '<button onclick="collapseAllMonths()">' + t('colapsarTodos') + '</button>' +
                     '</div>'}
                     ` +
                     ((state.histDateStart || state.histDateEnd) ? [] : months).filter(monthYear => {
@@ -5443,15 +6047,15 @@
                         if (totalMonthWithFixed < totalLimitForStatus) {
                             statusIcon = '🟢';
                             statusColor = '#22c55e';
-                            statusTitle = 'Abaixo do limite';
+                            statusTitle = t('abaixoLimite');
                         } else if (totalMonthWithFixed === totalLimitForStatus) {
                             statusIcon = '🟡';
                             statusColor = '#fbbf24';
-                            statusTitle = 'No limite';
+                            statusTitle = t('noLimite');
                         } else {
                             statusIcon = '🔴';
                             statusColor = '#ef4444';
-                            statusTitle = 'Acima do limite';
+                            statusTitle = t('acimaLimite');
                         }
                         
                         // Calcular economia para o badge
@@ -5508,7 +6112,7 @@
                                                 display: flex;
                                                 align-items: center;
                                                 gap: 4px;
-                                            " title="${economyForBadge > 0 ? 'Guardou' : 'Déficit'} ${state.currency || 'AED'} ${Math.abs(economyForBadge).toFixed(0)} (${Math.abs(economyPercent).toFixed(1)}% do rendimento)">
+                                            " title="${economyForBadge > 0 ? t('guardouTooltip') : t('deficitTooltip')} ${state.currency || 'AED'} ${Math.abs(economyForBadge).toFixed(0)} (${Math.abs(economyPercent).toFixed(1)}% ${t('doRendimento')})">
                                                 ${badgeIcon}
                                                 ${economyForBadge > 0 ? '+' : ''}${(economyForBadge / 1000).toFixed(1)}K
                                             </span>
@@ -5577,31 +6181,31 @@
                                             html += '<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; font-size: 0.85rem;">';
                                             
                                             // Rendimento
-                                            html += '<div><div style="opacity: 0.8;">💰 Rendimento</div>';
+                                            html += '<div><div style="opacity: 0.8;">'+t('rendimentoLabel')+'</div>';
                                             html += '<div style="font-size: 1.1rem; font-weight: 700; color: #10b981;">' + (state.currency || 'AED') + ' ' + monthIncome.toFixed(0) + '</div></div>';
                                             
                                             // Despesas Variáveis
-                                            html += '<div><div style="opacity: 0.8;">💸 Variáveis</div>';
+                                            html += '<div><div style="opacity: 0.8;">'+t('variaveis')+'</div>';
                                             html += '<div style="font-size: 1.1rem; font-weight: 700; color: #ef4444;">' + (state.currency || 'AED') + ' ' + totalMonth.toFixed(0) + '</div></div>';
                                             
                                             // Despesas Fixas
-                                            html += '<div><div style="opacity: 0.8;">🔒 Fixas</div>';
+                                            html += '<div><div style="opacity: 0.8;">'+t('fixasLabel2')+'</div>';
                                             html += '<div style="font-size: 1.1rem; font-weight: 700; color: #f59e0b;">' + (state.currency || 'AED') + ' ' + fixedMonthTotal.toFixed(0) + '</div></div>';
                                             
                                             // Total e Economia
                                             html += '<div style="grid-column: 1 / -1; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.2);">';
                                             html += '<div style="display: flex; justify-content: space-between; margin-bottom: 10px;">';
-                                            html += '<div style="opacity: 0.8;">📊 Total Despesas</div>';
+                                            html += '<div style="opacity: 0.8;">' + t('totalDespesasLabel') + '</div>';
                                             html += '<div style="font-weight: 700;">' + (state.currency || 'AED') + ' ' + totalMonthWithFixed.toFixed(0) + '</div>';
                                             html += '</div>';
-                                            html += '<div style="opacity: 0.8;">' + (isPositive ? '🎉' : '⚠️') + ' Economia</div>';
+                                            html += '<div style="opacity: 0.8;">' + (isPositive ? '🎉' : '⚠️') + ' ' + t('economiaLabel') + '</div>';
                                             html += '<div style="font-size: 1.3rem; font-weight: 700; color: ' + (isPositive ? '#22c55e' : '#ef4444') + ';">';
                                             html += (economy > 0 ? '+' : '') + (state.currency || 'AED') + ' ' + economy.toFixed(0) + '</div>';
                                             html += '<div style="font-size: 0.75rem; opacity: 0.7; margin-top: 5px;">';
                                             if (isPositive) {
-                                                html += 'Você guardou ' + economyPercent.toFixed(1) + '% do seu rendimento!';
+                                                html += t('guardouRendimento') + ' ' + economyPercent.toFixed(1) + '% ' + t('doSeuRendimento');
                                             } else {
-                                                html += (state.currency || 'AED') + ' ' + Math.abs(economy).toFixed(0) + ' a mais que o rendimento';
+                                                html += (state.currency || 'AED') + ' ' + Math.abs(economy).toFixed(0) + ' ' + t('aMaisQueRendimento');
                                             }
                                             html += '</div></div></div></div>';
                                             
@@ -5617,67 +6221,24 @@
                     }).join('')
                 }
                 
-                ${state.editingExpense ? `
-                    <div class="modal" onclick="if(event.target === this) cancelEditExpense()">
-                        <div class="modal-content">
-                            <div class="modal-header">✏️ Editar Despesa</div>
-                            
-                            <div class="input-group">
-                                <label class="label">Estabelecimento:</label>
-                                <input type="text" class="input-field" value="${state.editingExpense.merchant}" 
-                                       onchange="state.editingExpense.merchant = this.value">
-                            </div>
-                            
-                            <div class="input-group">
-                                <label class="label">${state.currency || 'AED'} — Valor:</label>
-                                <input type="number" step="0.01" class="input-field" value="${state.editingExpense.amount}" 
-                                       onchange="state.editingExpense.amount = parseFloat(this.value)">
-                            </div>
-                            
-                            <div class="input-group">
-                                <label class="label">Data (DD/MM/YYYY):</label>
-                                <input type="text" class="input-field" value="${state.editingExpense.date}" 
-                                       onchange="state.editingExpense.date = this.value">
-                            </div>
-                            
-                            <div class="input-group">
-                                <label class="label">Hora (HH:MM:SS):</label>
-                                <input type="text" class="input-field" value="${state.editingExpense.time}" 
-                                       onchange="state.editingExpense.time = this.value">
-                            </div>
-                            
-                            <div class="input-group">
-                                <label class="label">Observação (opcional):</label>
-                                <input type="text" class="input-field" placeholder="Ex: Presente, Dividido..." value="${state.editingExpense.obs || ''}" 
-                                       onchange="state.editingExpense.obs = this.value">
-                            </div>
-                            
-                            <div class="input-group">
-                                <label class="label">Categoria:</label>
-                                <div class="category-list">
-                                    ${CATEGORIES.map(cat => `
-                                        <div class="category-item ${state.editingExpense.category === cat.id ? 'selected' : ''}" 
-                                             onclick="state.editingExpense.category = '${cat.id}'; render()">
-                                            <div class="category-icon">${cat.icon}</div>
-                                            <div class="category-name">${cat.name}</div>
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            </div>
-                            
-                            <div class="modal-buttons">
-                                <button class="btn btn-secondary" onclick="cancelEditExpense()">Cancelar</button>
-                                <button class="btn" onclick="saveEditExpense()">Salvar</button>
-                            </div>
-                        </div>
-                    </div>
-                ` : ''}
+                ${renderEditModal()}
             `;
         }
     }
 
     // Inicializar
     loadData();
+
+    // Event delegation para botões de editar/excluir (evita problemas de quote escaping)
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('[data-action]');
+        if (!btn) return;
+        const action = btn.dataset.action;
+        const id = btn.dataset.id;
+        if (!action || !id) return;
+        if (action === 'edit') startEditExpense(id);
+        if (action === 'delete') deleteExpense(id);
+    });
 </script>
 
 </body>
