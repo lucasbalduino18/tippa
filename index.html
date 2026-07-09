@@ -568,7 +568,7 @@
     });
 
     // ⚠️ IMPORTANTE: COLE SUA URL DO GOOGLE SHEETS AQUI
-    const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbwEswF9iD732EPa1dD6IEhjXR0CpbE2nWVrhVyr_oiyI6S0Fz9yTzvqA3l7-6Wg-Mn0/exec';
+   const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbwEswF9iD732EPa1dD6IEhjXR0CpbE2nWVrhVyr_oiyI6S0Fz9yTzvqA3l7-6Wg-Mn0/exec';
 
     // Categorias padrão
     const CATEGORIES = [
@@ -1240,18 +1240,27 @@
         return true;
     }
 
+    // Utilitário: converte DD/MM/YYYY → YYYY-MM-DD
+    function dateToISO(dateStr) {
+        if (!dateStr) return '';
+        const p = dateStr.split('/');
+        if (p.length < 3) return '';
+        return p[2] + '-' + p[1].padStart(2,'0') + '-' + p[0].padStart(2,'0');
+    }
+
+    // Verifica se uma despesa está dentro do período filtrado
+    function inDateRange(e) {
+        const eDate = dateToISO(e.date);
+        if (!eDate) return false;
+        const afterStart = !state.histDateStart || eDate >= state.histDateStart;
+        const beforeEnd  = !state.histDateEnd   || eDate <= state.histDateEnd;
+        return afterStart && beforeEnd;
+    }
+
+    // Renderiza lista de despesas respeitando o filtro (usado dentro dos meses colapsados)
     function renderFilteredExpenses(expenses) {
-        // Filtrar despesas do mês pelo período seleccionado
         const visibleExpenses = (state.histDateStart || state.histDateEnd)
-            ? expenses.filter(e => {
-                if (!e.date) return false;
-                const p = e.date.split('/');
-                if (p.length < 3) return false;
-                const eDate = p[2] + '-' + p[1].padStart(2,'0') + '-' + p[0].padStart(2,'0');
-                const afterStart = !state.histDateStart || eDate >= state.histDateStart;
-                const beforeEnd  = !state.histDateEnd   || eDate <= state.histDateEnd;
-                return afterStart && beforeEnd;
-            })
+            ? expenses.filter(inDateRange)
             : expenses;
 
         return visibleExpenses.map(e => {
@@ -1261,9 +1270,6 @@
             const time     = e.time || '';
             const category = e.category || 'outros';
             const obs      = e.obs || '';
-            const catColor = getCategoryColor(category);
-            const catIcon  = getCategoryIcon(category);
-            const catName  = getCategoryName(category);
             const cur      = state.currency || 'AED';
 
             return '<div class="expense-item">' +
@@ -1271,7 +1277,7 @@
                     '<div class="expense-merchant">' + merchant + '</div>' +
                     '<div class="expense-date">' + date + ' às ' + time + '</div>' +
                     (obs ? '<div class="expense-date" style="font-style: italic; margin-top: 4px;">💬 ' + obs + '</div>' : '') +
-                    '<span class="expense-category" style="background: ' + catColor + '">' + catIcon + ' ' + catName + '</span>' +
+                    '<span class="expense-category" style="background: ' + getCategoryColor(category) + '">' + getCategoryIcon(category) + ' ' + getCategoryName(category) + '</span>' +
                 '</div>' +
                 '<div style="display:flex; align-items:center;">' +
                     '<div class="expense-amount">' + cur + ' ' + amount.toFixed(2) + '</div>' +
@@ -1282,90 +1288,76 @@
         }).join('');
     }
 
+    // Resumo do período + lista flat de despesas filtradas
     function renderPeriodSummary(months, expensesByMonth) {
         if (!state.histDateStart && !state.histDateEnd) return '';
 
-        // Função auxiliar: converte DD/MM/YYYY → YYYY-MM-DD para comparação
-        function toISO(dateStr) {
-            if (!dateStr) return '';
-            const p = dateStr.split('/');
-            if (p.length < 3) return '';
-            return p[2] + '-' + p[1].padStart(2,'0') + '-' + p[0].padStart(2,'0');
-        }
-
-        // Filtrar despesas individualmente por data
+        // Recolher todas as despesas do período, ordenadas por data desc
         const allFiltered = [];
-        const filteredMonthsSet = new Set();
         months.forEach(monthYear => {
             (expensesByMonth[monthYear] || []).forEach(e => {
-                const eDate = toISO(e.date);
-                if (!eDate) return;
-                const afterStart = !state.histDateStart || eDate >= state.histDateStart;
-                const beforeEnd  = !state.histDateEnd   || eDate <= state.histDateEnd;
-                if (afterStart && beforeEnd) {
-                    allFiltered.push(e);
-                    filteredMonthsSet.add(monthYear);
-                }
+                if (inDateRange(e)) allFiltered.push(e);
             });
         });
-
-        const filteredMonths = [...filteredMonthsSet];
+        allFiltered.sort((a, b) => {
+            const da = dateToISO(a.date) + (a.time || '');
+            const db = dateToISO(b.date) + (b.time || '');
+            return db.localeCompare(da);
+        });
 
         if (allFiltered.length === 0) {
             return '<div style="text-align:center; padding: 20px; color: var(--text-3); font-size: 0.9rem;">Nenhuma despesa neste período</div>';
         }
 
         const periodVariavel = allFiltered.reduce((sum, e) => sum + (parseFloat(e.amount)||0), 0);
-        // Fixas: incluir os meses que têm despesas no período (proporcional não é viável, inclui o mês completo)
-        const periodFixo = filteredMonths.reduce((sum, m) =>
-            sum + (state.monthlyFixedExpenses[m] || []).reduce((s, f) => s + (parseFloat(f.amount)||0), 0), 0);
-        const periodTotal = periodVariavel + periodFixo;
-        const periodIncome = filteredMonths.reduce((sum, m) => {
-            const [mo, ye] = m.split('/').map(Number);
-            const key = mo + '/' + ye;
-            return sum + (state.monthlyIncome[key] || state.monthlyIncome[m] || 0);
-        }, 0);
-        const periodEconomy = periodIncome - periodTotal;
-        const numMonths = filteredMonths.length;
         const numDays = state.histDateStart && state.histDateEnd
             ? Math.round((new Date(state.histDateEnd) - new Date(state.histDateStart)) / 86400000) + 1
             : null;
+        const cur = state.currency || 'AED';
 
-        const statCard = (icon, label, color, value, avg) =>
-            '<div style="background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px;">' +
-            '<div style="font-size: 0.7rem; color: var(--text-2); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em;">' + icon + ' ' + label + '</div>' +
-            '<div style="font-size: 1.1rem; font-weight: 700; color: ' + color + '; font-variant-numeric: tabular-nums;">' + value + '</div>' +
-            '<div style="font-size: 0.7rem; color: var(--text-3); margin-top: 2px;">' + avg + '</div>' +
-            '</div>';
-
+        // ── Resumo: só variáveis ──────────────────────────────────────────
         let html = '<div style="background: var(--surface); border: 1px solid rgba(0,212,170,0.2); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 16px; border-left: 3px solid var(--teal);">';
-        const periodLabel = numDays !== null ? (numDays + ' ' + (numDays === 1 ? 'dia' : 'dias')) : (numMonths + ' ' + (numMonths === 1 ? 'mês' : 'meses'));
-        html += '<div style="font-size: 0.72rem; color: var(--teal); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 14px;">📊 Resumo — ' + periodLabel + ' · ' + allFiltered.length + ' despesas</div>';
-        html += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">';
-        html += statCard('💸', 'Variáveis', '#ef4444', formatAED(periodVariavel), numDays ? 'Média ' + formatAED(periodVariavel/numDays) + '/dia' : 'Média ' + formatAED(periodVariavel/numMonths) + '/mês');
-        html += statCard('🔒', 'Fixas', '#f59e0b', formatAED(periodFixo), numMonths > 0 ? 'Média ' + formatAED(periodFixo/numMonths) + '/mês' : '');
-        html += statCard('📦', 'Total Gasto', 'var(--text-1)', formatAED(periodTotal), numDays ? 'Média ' + formatAED(periodTotal/numDays) + '/dia' : 'Média ' + formatAED(periodTotal/numMonths) + '/mês');
-        html += statCard('💰', 'Rendimento', '#22c55e',
-            periodIncome > 0 ? formatAED(periodIncome) : '—',
-            periodIncome > 0 ? numMonths > 0 ? 'Média ' + formatAED(periodIncome/numMonths) + '/mês' : '' : 'Sem dados');
+        const periodLabel = numDays !== null
+            ? (numDays + ' ' + (numDays === 1 ? 'dia' : 'dias'))
+            : '';
+        html += '<div style="font-size: 0.72rem; color: var(--teal); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 14px;">📊 Resumo — ' + (periodLabel ? periodLabel + ' · ' : '') + allFiltered.length + ' despesas</div>';
+
+        // Card único: total variáveis
+        html += '<div style="background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px; display: flex; justify-content: space-between; align-items: center;">';
+        html += '<div>';
+        html += '<div style="font-size: 0.7rem; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">💸 Total Variáveis</div>';
+        html += (numDays ? '<div style="font-size: 0.7rem; color: var(--text-3);">Média ' + formatAED(periodVariavel/numDays) + '/dia</div>' : '');
+        html += '</div>';
+        html += '<div style="font-size: 1.4rem; font-weight: 700; color: #ef4444; font-variant-numeric: tabular-nums;">' + formatAED(periodVariavel) + '</div>';
+        html += '</div>';
         html += '</div>';
 
-        if (periodIncome > 0) {
-            const econColor = periodEconomy >= 0 ? '#22c55e' : '#ef4444';
-            const econBg    = periodEconomy >= 0 ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)';
-            const econBorder= periodEconomy >= 0 ? 'rgba(34,197,94,0.2)'  : 'rgba(239,68,68,0.2)';
-            const econLabel = periodEconomy >= 0 ? '🎉 Total Economizado' : '🚨 Total Déficit';
-            html += '<div style="padding: 12px; background: ' + econBg + '; border: 1px solid ' + econBorder + '; border-radius: var(--radius-sm); display: flex; justify-content: space-between; align-items: center;">';
-            html += '<div>';
-            html += '<div style="font-size: 0.72rem; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.05em;">' + econLabel + '</div>';
-            html += '<div style="font-size: 0.72rem; color: var(--text-3); margin-top: 2px;">Média ' + formatAED(Math.abs(periodEconomy)/numMonths) + '/mês</div>';
-            html += '</div>';
-            html += '<div style="font-size: 1.3rem; font-weight: 700; color: ' + econColor + '; font-variant-numeric: tabular-nums;">';
-            html += (periodEconomy >= 0 ? '+' : '') + formatAED(periodEconomy);
-            html += '</div></div>';
-        }
+        // ── Lista flat de despesas filtradas ──────────────────────────────
+        html += '<div style="margin-bottom: 16px;">';
+        allFiltered.forEach(e => {
+            const amount   = parseFloat(e.amount) || 0;
+            const merchant = e.merchant || 'Sem nome';
+            const date     = e.date || '';
+            const time     = e.time || '';
+            const category = e.category || 'outros';
+            const obs      = e.obs || '';
 
+            html += '<div class="expense-item">' +
+                '<div class="expense-info">' +
+                    '<div class="expense-merchant">' + merchant + '</div>' +
+                    '<div class="expense-date">' + date + ' às ' + time + '</div>' +
+                    (obs ? '<div class="expense-date" style="font-style: italic; margin-top: 4px;">💬 ' + obs + '</div>' : '') +
+                    '<span class="expense-category" style="background: ' + getCategoryColor(category) + '">' + getCategoryIcon(category) + ' ' + getCategoryName(category) + '</span>' +
+                '</div>' +
+                '<div style="display:flex; align-items:center;">' +
+                    '<div class="expense-amount">' + cur + ' ' + amount.toFixed(2) + '</div>' +
+                    '<button class="edit-btn" onclick="startEditExpense(\"' + e.id + '\")">✏️</button>' +
+                    '<button class="delete-btn" onclick="deleteExpense(\"' + e.id + '\")">🗑️</button>' +
+                '</div>' +
+            '</div>';
+        });
         html += '</div>';
+
         return html;
     }
 
@@ -5464,14 +5456,16 @@
                         </div>
                     </div>
 
-                    <!-- Resumo do Período (só aparece quando há filtro activo) -->
+                    <!-- Resumo + lista flat quando filtro activo; meses normais caso contrário -->
                     ${renderPeriodSummary(months, expensesByMonth)}
 
-                    <div class="expand-controls">
-                        <button onclick="expandAllMonths()">📂 Expandir Todos</button>
-                        <button onclick="collapseAllMonths()">📁 Colapsar Todos</button>
-                    </div>` +
-                    months.filter(monthYear => {
+                    ${(state.histDateStart || state.histDateEnd) ? '' :
+                    '<div class="expand-controls">' +
+                        '<button onclick="expandAllMonths()">📂 Expandir Todos</button>' +
+                        '<button onclick="collapseAllMonths()">📁 Colapsar Todos</button>' +
+                    '</div>'}
+                    ` +
+                    ((state.histDateStart || state.histDateEnd) ? [] : months).filter(monthYear => {
                         if (!state.histDateStart && !state.histDateEnd) return true;
                         // Verificar se o mês tem alguma despesa dentro do intervalo de datas
                         const expenses = expensesByMonth[monthYear] || [];
@@ -5498,8 +5492,7 @@
                         // Total real do mês (variáveis + fixas)
                         const totalMonthWithFixed = totalMonth + fixedMonthTotal;
                         
-                        // Auto-expandir quando há filtro de data activo
-                        const isExpanded = (state.histDateStart || state.histDateEnd) ? true : state.expandedMonths[monthYear];
+                        const isExpanded = state.expandedMonths[monthYear];
                         
                         // Determinar se ficou acima ou abaixo do limite
                         let statusIcon = '';
