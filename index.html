@@ -11,7 +11,10 @@
     <meta http-equiv="Expires" content="0">
     <title>Minhas Despesas</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"></noscript>
     <style>
     /* ============================================
        DESIGN SYSTEM — COCKPIT NIGHT MODE
@@ -515,8 +518,8 @@
 </style>
 
 <!-- jsPDF para geração de PDF -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
+
 
 </head>
 <body>
@@ -679,7 +682,6 @@
             };
             sessionStorage.setItem(CACHE_KEY, JSON.stringify(cache));
         } catch (e) {
-            console.log('Cache save failed:', e);
         }
     }
 
@@ -692,15 +694,11 @@
             const age = Date.now() - cache.timestamp;
             
             if (age < CACHE_DURATION) {
-                console.log('✅ Cache HIT - Idade:', Math.round(age/1000), 'segundos');
                 return cache.data;
             }
-            
-            console.log('❌ Cache MISS - Expirado');
             sessionStorage.removeItem(CACHE_KEY);
             return null;
         } catch (e) {
-            console.log('Cache load failed:', e);
             return null;
         }
     }
@@ -708,17 +706,12 @@
     function clearAppCache() {
         try {
             sessionStorage.removeItem(CACHE_KEY);
-            console.log('✅ Cache limpo');
         } catch (e) {
-            console.log('Cache clear failed:', e);
         }
     }
     
     function updateCache() {
         try {
-            console.log('💾 Atualizando cache...');
-            console.log('💾 state.goal:', state.goal);
-            console.log('💾 state.goalFixed:', state.goalFixed);
             
             saveCache({
                 expenses: state.expenses,
@@ -728,9 +721,7 @@
                 goalFixed: state.goalFixed,
                 monthlyIncome: state.monthlyIncome
             });
-            console.log('✅ Cache atualizado com sucesso');
         } catch (e) {
-            console.log('❌ Erro ao atualizar cache:', e);
         }
     }
 
@@ -744,9 +735,6 @@
         if (!forceRefresh) {
             const cached = loadCache();
             if (cached) {
-                console.log('📦 Carregando do cache...');
-                console.log('📦 cached.goal:', cached.goal);
-                console.log('📦 cached.goalFixed:', cached.goalFixed);
                 
                 state.expenses = cached.expenses || [];
                 state.goal = cached.goal || 5000;
@@ -771,14 +759,6 @@
                 state.monthlyIncome = cached.monthlyIncome || {};
                 state.loading = false;
                 
-                console.log('📦 Dados carregados do cache:');
-                console.log('✅ state.goal:', state.goal);
-                console.log('✅ state.goalFixed:', state.goalFixed);
-                console.log('Despesas:', state.expenses.length);
-                console.log('Fixas:', state.fixedExpenses.length);
-                console.log('Fixas Mensais:', Object.keys(state.monthlyFixedExpenses).length, 'meses');
-                console.log('Rendimentos:', Object.keys(state.monthlyIncome).length, 'meses');
-                
                 if (wasLoading) {
                     render();
                 }
@@ -787,14 +767,19 @@
         }
         
         // Função auxiliar: fetch com retry automático
-        async function fetchWithRetry(url, retries = 3, delayMs = 1000) {
+        // No carregamento inicial: 2 tentativas, 600ms — favorece velocidade
+        // Em actualizações forçadas: 3 tentativas, 1000ms — favorece fiabilidade
+        async function fetchWithRetry(url, retries = forceRefresh ? 3 : 2, delayMs = forceRefresh ? 1000 : 600) {
             for (let attempt = 1; attempt <= retries; attempt++) {
                 try {
-                    const response = await fetch(url);
+                    // Timeout de 8s — evita ficar pendurado em 4G
+                    const controller = new AbortController();
+                    const timer = setTimeout(() => controller.abort(), 8000);
+                    const response = await fetch(url, { signal: controller.signal });
+                    clearTimeout(timer);
                     const data = await response.json();
                     return { ok: true, data };
                 } catch (err) {
-                    console.warn(`⚠️ Tentativa ${attempt}/${retries} falhou para ${url.split('action=')[1]}: ${err.message}`);
                     if (attempt < retries) await new Promise(r => setTimeout(r, delayMs * attempt));
                 }
             }
@@ -802,14 +787,12 @@
         }
 
         try {
-            console.log('=== INICIANDO CARREGAMENTO ===');
 
             // ── Fase 1: Despesas (maior payload — primeiro) ──────────────
             const despesasRes = await fetchWithRetry(`${SHEETS_URL}?action=getDespesas`);
             if (despesasRes.ok) {
                 const d = despesasRes.data;
                 state.expenses = d.expenses || d || [];
-                console.log('✅ Despesas:', state.expenses.length);
             } else {
                 console.error('❌ Despesas falharam após retries');
                 state.expenses = state.expenses || [];
@@ -831,7 +814,6 @@
                 state.goalFixed  = (m.metaFixed  != null && m.metaFixed  !== '') ? Number(m.metaFixed)  : (state.goalFixed  || 0);
                 state.yearlyGoal = (m.yearlyGoal != null && m.yearlyGoal !== '') ? Number(m.yearlyGoal) : (state.yearlyGoal || 0);
                 if (m.currency && m.currency.trim().length >= 2) state.currency = m.currency.trim().toUpperCase();
-                console.log('✅ Meta:', state.goal, '| Fixas:', state.goalFixed, '| Anual:', state.yearlyGoal, '| Moeda:', state.currency);
             } else {
                 console.error('❌ Meta falhou após retries — mantendo valores actuais');
             }
@@ -839,7 +821,6 @@
             // Processar fixas
             if (fixedRes.ok) {
                 state.fixedExpenses = fixedRes.data.fixedExpenses || [];
-                console.log('✅ Fixas:', state.fixedExpenses.length);
             } else {
                 console.error('❌ Fixas falharam após retries — mantendo valores actuais');
                 state.fixedExpenses = state.fixedExpenses || [];
@@ -848,7 +829,6 @@
             // Processar rendimentos
             if (incomeRes.ok) {
                 state.monthlyIncome = incomeRes.data.income || {};
-                console.log('✅ Rendimentos:', Object.keys(state.monthlyIncome).length, 'meses');
             } else {
                 console.error('❌ Rendimentos falharam após retries — mantendo valores actuais');
                 state.monthlyIncome = state.monthlyIncome || {};
@@ -864,7 +844,6 @@
                     }
                 });
                 state.monthlyFixedExpenses = cleanedFixed;
-                console.log('✅ Fixas Mensais:', Object.keys(state.monthlyFixedExpenses).length, 'meses');
             } else {
                 console.error('❌ Fixas mensais falharam após retries — mantendo valores actuais');
                 state.monthlyFixedExpenses = state.monthlyFixedExpenses || {};
@@ -881,7 +860,6 @@
                 currency: state.currency,
                 monthlyIncome: state.monthlyIncome
             });
-            console.log('💾 Cache salvo');
 
             state.loading = false;
             if (wasLoading) render();
@@ -955,7 +933,6 @@
         try {
             const response = await fetch(url);
             const result = await response.json();
-            console.log('✅ Limite variáveis atualizado:', valor);
             return result.success;
         } catch (error) {
             console.error('Erro ao atualizar limite:', error);
@@ -969,7 +946,6 @@
         try {
             const response = await fetch(url);
             const result = await response.json();
-            console.log('✅ Limite fixas atualizado:', valor);
             return result.success;
         } catch (error) {
             console.error('Erro ao atualizar limite fixas:', error);
@@ -983,7 +959,6 @@
         try {
             const response = await fetch(url);
             const result = await response.json();
-            console.log('✅ Meta anual atualizada:', valor);
             return result.success;
         } catch (error) {
             console.error('Erro ao atualizar meta anual:', error);
@@ -1011,21 +986,14 @@
     async function getMonthlyFixedExpenses(month) {
         try {
             const url = `${SHEETS_URL}?action=getMonthlyFixedExpenses&month=${encodeURIComponent(month)}`;
-            console.log('🌐 Chamando API:', url);
             
             const response = await fetch(url);
-            console.log('📡 Response status:', response.status);
             
             const result = await response.json();
-            console.log('📦 Result completo:', result);
             
             if (result.success) {
-                console.log(`✅ Fixas do mês ${month}:`, result.fixedExpenses.length);
-                console.log('📋 Dados:', result.fixedExpenses);
                 return result.fixedExpenses || [];
             }
-            
-            console.log(`⚠️ Mês ${month} sem fixas ou erro:`, result);
             return [];
         } catch (error) {
             console.error('❌ Erro ao obter fixas mensais:', error);
@@ -1040,7 +1008,6 @@
             const result = await response.json();
             
             if (result.success) {
-                console.log(`✅ Fixas do mês ${month} salvas`);
                 return true;
             }
             
@@ -1058,7 +1025,6 @@
             const result = await response.json();
             
             if (result.success) {
-                console.log(`✅ Copiadas ${result.count} fixas de ${fromMonth} para ${toMonth}`);
                 return true;
             }
             
@@ -1078,7 +1044,6 @@
             const result = await response.json();
             
             if (result.success) {
-                console.log(`✅ Fixa deletada do mês ${month}`);
                 return true;
             }
             
@@ -1096,11 +1061,8 @@
             const result = await response.json();
             
             if (result.success) {
-                console.log(`✅ Todas as fixas mensais:`, Object.keys(result.monthlyFixed || {}).length, 'meses');
                 return result.monthlyFixed || {};
             }
-            
-            console.log('⚠️ Nenhuma fixa mensal cadastrada');
             return {};
         } catch (error) {
             console.error('Erro ao obter todas as fixas mensais:', error);
@@ -1777,14 +1739,11 @@
 
     async function updateGoal(value) {
         const newGoal = parseFloat(value) || 0;
-        console.log('📝 Atualizando limite variáveis:', newGoal);
-        console.log('📝 Limite fixas atual:', state.goalFixed);
         
         const success = await updateGoalInSheets(newGoal);
         
         if (success) {
             state.goal = newGoal;
-            console.log('✅ state.goal atualizado para:', state.goal);
             
             // Atualizar cache também
             updateCache();
@@ -1797,14 +1756,11 @@
     
     async function updateGoalFixed(value) {
         const newGoalFixed = parseFloat(value) || 0;
-        console.log('📝 Atualizando limite fixas:', newGoalFixed);
-        console.log('📝 Limite variáveis atual:', state.goal);
         
         const success = await updateGoalFixedInSheets(newGoalFixed);
         
         if (success) {
             state.goalFixed = newGoalFixed;
-            console.log('✅ state.goalFixed atualizado para:', state.goalFixed);
             
             // Atualizar cache também
             updateCache();
@@ -1817,13 +1773,11 @@
     
     async function updateYearlyGoal(value) {
         const newYearlyGoal = parseFloat(value) || 0;
-        console.log('📝 Atualizando meta anual:', newYearlyGoal);
         
         const success = await updateYearlyGoalInSheets(newYearlyGoal);
         
         if (success) {
             state.yearlyGoal = newYearlyGoal;
-            console.log('✅ state.yearlyGoal atualizado para:', state.yearlyGoal);
             
             // Atualizar cache também
             updateCache();
@@ -2297,19 +2251,14 @@
     
     // Selecionar categoria sem perder valores dos campos
     function selectCategoryForFixed(categoryId) {
-        console.log('selectCategoryForFixed chamada com:', categoryId);
         
         // Salvar valores atuais dos campos
         const name = document.getElementById('fixedName')?.value || '';
         const amount = document.getElementById('fixedAmount')?.value || '';
         const day = document.getElementById('fixedDay')?.value || '';
         
-        console.log('Valores salvos:', { name, amount, day });
-        
         // Atualizar categoria
         state.selectedCategory = categoryId;
-        
-        console.log('Categoria selecionada:', state.selectedCategory);
         
         // Re-renderizar
         render();
@@ -2319,7 +2268,6 @@
             if (name) document.getElementById('fixedName').value = name;
             if (amount) document.getElementById('fixedAmount').value = amount;
             if (day) document.getElementById('fixedDay').value = day;
-            console.log('Valores restaurados');
         }, 10);
     }
 
@@ -2328,13 +2276,8 @@
     // ============================================
     
     async function loadMonthlyFixed(month) {
-        console.log('📥 Carregando fixas do mês:', month);
-        console.log('📍 URL:', `${SHEETS_URL}?action=getMonthlyFixedExpenses&month=${encodeURIComponent(month)}`);
         
         const fixedExpenses = await getMonthlyFixedExpenses(month);
-        
-        console.log('📦 Recebido do servidor:', fixedExpenses.length, 'fixas');
-        console.log('📦 Dados:', fixedExpenses);
         
         state.monthlyFixedExpenses[month] = fixedExpenses;
         updateCache();
@@ -2355,7 +2298,6 @@
         // Prevenir duplicação - desabilitar botão
         const btn = document.getElementById('addFixedBtn');
         if (btn && btn.disabled) {
-            console.log('⚠️ Botão já desabilitado, ignorando clique duplicado');
             return; // Já está processando
         }
         
@@ -2397,8 +2339,6 @@
             // Criar array temporário para salvar (state atual + nova)
             const updatedList = [...state.monthlyFixedExpenses[state.selectedFixedMonth], newFixed];
             
-            console.log(`📝 Salvando ${updatedList.length} fixas no servidor...`);
-            
             // Salvar no servidor
             const success = await saveMonthlyFixedExpenses(
                 state.selectedFixedMonth,
@@ -2406,7 +2346,6 @@
             );
             
             if (success) {
-                console.log('✅ Salvo! Recarregando do servidor...');
                 
                 // IMPORTANTE: Recarregar do servidor para garantir sincronização
                 await loadMonthlyFixed(state.selectedFixedMonth);
@@ -2416,8 +2355,6 @@
                 document.getElementById('fixedName').value = '';
                 document.getElementById('fixedAmount').value = '';
                 document.getElementById('fixedDay').value = '';
-                
-                console.log('✅ Despesa fixa adicionada com sucesso!');
             } else {
                 throw new Error('Falha ao salvar');
             }
@@ -2746,7 +2683,25 @@
     // FUNÇÃO - GERAR RELATÓRIO ANUAL EM PDF
     // ============================================
     
+    async function loadJsPDF() {
+        if (window.jspdf) return true;
+        return new Promise((resolve, reject) => {
+            const s1 = document.createElement('script');
+            s1.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+            s1.onload = () => {
+                const s2 = document.createElement('script');
+                s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js';
+                s2.onload = () => resolve(true);
+                s2.onerror = () => reject(new Error('Erro ao carregar jsPDF AutoTable'));
+                document.head.appendChild(s2);
+            };
+            s1.onerror = () => reject(new Error('Erro ao carregar jsPDF'));
+            document.head.appendChild(s1);
+        });
+    }
+
     async function generateAnnualReport(year) {
+        try { await loadJsPDF(); } catch(e) { showToast('❌ Erro ao carregar gerador de PDF', 'error'); return; }
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF({
             orientation: 'landscape',
@@ -3475,11 +3430,6 @@
     }
 
     function render() {
-        console.log('=== RENDER CHAMADO ===');
-        console.log('state.loading:', state.loading);
-        console.log('state.expenses:', state.expenses);
-        console.log('state.expenses.length:', state.expenses?.length);
-        console.log('state.tab:', state.tab);
         
         const app = document.getElementById('app');
 
@@ -4700,8 +4650,6 @@
                     
                     state.selectedFixedMonth = monthWithData || monthsList[0] || currentMonthKey;
                 }
-                
-                console.log('📅 Mês selecionado automaticamente:', state.selectedFixedMonth);
             }
             
             // Obter fixas do mês selecionado
@@ -4919,12 +4867,9 @@
             // IMPORTANTE: Carregar fixas do mês selecionado se não estiver no state
             // MAS NÃO durante edição (para não causar conflito)
             if (!state.editingFixed && (!currentMonthFixed || currentMonthFixed.length === 0)) {
-                console.log('🔄 Carregando fixas do mês', state.selectedFixedMonth);
                 loadMonthlyFixed(state.selectedFixedMonth).then(() => {
-                    console.log('✅ Fixas carregadas, re-renderizando...');
                 });
             } else {
-                console.log('✅ Já tem', currentMonthFixed.length, 'fixas no state para', state.selectedFixedMonth);
             }
             
             // Popular campos se estiver editando
@@ -4962,7 +4907,6 @@
                 
                 // DEBUG primeira despesa de cada mês
                 if (!expensesByMonth[monthYear]) {
-                    console.log(`📅 Novo mês detectado: "${rawMonthYear}" → normalizado: "${monthYear}"`);
                 }
                 
                 if (!expensesByMonth[monthYear]) {
@@ -4971,12 +4915,6 @@
                 expensesByMonth[monthYear].push(e);
                 processCount++;
             });
-            
-            console.log('=== RESUMO PROCESSAMENTO ===');
-            console.log('Processadas:', processCount);
-            console.log('Puladas:', skipCount);
-            console.log('Meses encontrados:', Object.keys(expensesByMonth));
-            console.log('expensesByMonth:', expensesByMonth);
 
             const months = Object.keys(expensesByMonth).sort((a, b) => {
                 const [monthA, yearA] = a.split('/').map(Number);
@@ -5624,11 +5562,6 @@
                                         
                                         // Debug no console (opcional - pode remover depois)
                                         if (normalizedMonthYear === '1/2026' || monthYear === '01/2026') {
-                                            console.log('🔍 Debug Janeiro 2026:');
-                                            console.log('  monthYear original:', monthYear);
-                                            console.log('  normalizedMonthYear:', normalizedMonthYear);
-                                            console.log('  monthIncome encontrado:', monthIncome);
-                                            console.log('  Chaves disponíveis:', Object.keys(state.monthlyIncome));
                                         }
                                         
                                         if (monthIncome > 0) {
