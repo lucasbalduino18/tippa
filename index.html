@@ -2265,7 +2265,7 @@
             
             if (success) {
                 // ✅ OTIMIZAÇÃO: Remover localmente sem recarregar tudo
-                state.expenses = state.expenses.filter(e => String(e.id) !== String(id));
+                const _idx = state.expenses.findIndex(e => String(e.id) === String(id)); if (_idx !== -1) state.expenses.splice(_idx, 1);
                 updateCache();
                 render();
             } else {
@@ -6073,22 +6073,27 @@
                         // Calcular percentual do rendimento (para tooltip)
                         const economyPercent = hasIncomeBadge ? (economyForBadge / incomeForBadge * 100) : 0;
                         
-                        // ===== SISTEMA DE CORES BASEADO NOS LIMITES =====
-                        const totalLimit = state.goal + state.goalFixed;  // Limite total (variável + fixa)
+                        // ===== BADGE: saldo positivo (verde) ou negativo (vermelho) =====
+                        // (a bolinha antes do valor usa a meta — ver abaixo)
                         let badgeColor, badgeBg, badgeIcon;
-                        
-                        if (totalMonthWithFixed < totalLimit) {
-                            // Verde - Abaixo do limite
+
+                        if (!hasIncomeBadge) {
+                            // Sem rendimento definido — não exibe badge
+                            badgeColor = '#94A3B8';
+                            badgeBg = 'rgba(148, 163, 184, 0.15)';
+                            badgeIcon = '•';
+                        } else if (economyForBadge > 0) {
+                            // Verde — saldo positivo (rendimento > total gasto)
                             badgeColor = '#22c55e';
                             badgeBg = 'rgba(34, 197, 94, 0.2)';
                             badgeIcon = '💚';
-                        } else if (totalMonthWithFixed === totalLimit) {
-                            // Amarelo - Exatamente no limite
+                        } else if (economyForBadge === 0) {
+                            // Amarelo — saldo neutro
                             badgeColor = '#f59e0b';
                             badgeBg = 'rgba(245, 158, 11, 0.2)';
                             badgeIcon = '⚠️';
                         } else {
-                            // Vermelho - Acima do limite
+                            // Vermelho — saldo negativo (gastou mais que o rendimento)
                             badgeColor = '#ef4444';
                             badgeBg = 'rgba(239, 68, 68, 0.2)';
                             badgeIcon = '🔴';
