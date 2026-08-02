@@ -2194,6 +2194,8 @@
         // Lock para evitar duplo envio
         if (state.saving) return;
         state.saving = true;
+        // Safety timeout — libera o lock após 30s mesmo que algo falhe silenciosamente
+        const _savingTimeout = setTimeout(() => { state.saving = false; render(); }, 30000);
 
         // Capturar o SMS do campo antes de processar
         const smsInput = document.getElementById('smsInput');
@@ -2242,12 +2244,16 @@
         const success = await addExpenseToSheets(parsed);
 
         // Sempre reabilitar o botão e liberar o lock
+        clearTimeout(_savingTimeout);
         state.saving = false;
-        if (btn) { btn.disabled = false; btn.textContent = t('extrairAdicionar'); }
+        render(); // Re-render para reactivar o botão correctamente
 
         if (success) {
             // ✅ OTIMIZAÇÃO: Atualizar state localmente sem recarregar
-            state.expenses.push(parsed);
+            // Verificar se o ID já existe (protecção extra contra duplicação)
+            if (!state.expenses.some(e => String(e.id) === String(parsed.id))) {
+                state.expenses.push(parsed);
+            }
             updateCache();
             state.sms = '';
             state.obs = '';
@@ -5134,8 +5140,8 @@
                         </div>
                     </div>
                     
-                    <button class="btn btn-add-expense" onclick="${state.manualEntry ? 'addManualExpense()' : 'addExpense()'}">
-                        ${state.manualEntry ? '✅ ' + t('adicionarManualmente') : '📱 ' + t('extrairAdicionar')}
+                    <button class="btn btn-add-expense" onclick="${state.manualEntry ? 'addManualExpense()' : 'addExpense()'}" ${state.saving ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>
+                        ${state.saving ? '⏳ ' + t('salvando') : (state.manualEntry ? '✅ ' + t('adicionarManualmente') : '📱 ' + t('extrairAdicionar'))}
                     </button>
                 </div>
                 
