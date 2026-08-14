@@ -1218,14 +1218,12 @@
                 state.expenses = state.expenses || [];
             }
 
-            // ── Fase 2: Meta + Fixas + Rendimentos em paralelo ──────────
-            // Agora com menos pressão no servidor (despesas já terminaram)
-            const [metaRes, fixedRes, incomeRes, monthlyFixedRes] = await Promise.all([
-                fetchWithRetry(`${SHEETS_URL}?action=getMeta`),
-                fetchWithRetry(`${SHEETS_URL}?action=getFixedExpenses`),
-                fetchWithRetry(`${SHEETS_URL}?action=getIncome`),
-                fetchWithRetry(`${SHEETS_URL}?action=getAllMonthlyFixed`)
-            ]);
+            // ── Fase 2: Meta + Fixas + Rendimentos + FixasMensais (sequencial) ──
+            // Sequencial evita throttle do GAS com múltiplos requests simultâneos
+            const metaRes        = await fetchWithRetry(`${SHEETS_URL}?action=getMeta`);
+            const fixedRes       = await fetchWithRetry(`${SHEETS_URL}?action=getFixedExpenses`);
+            const incomeRes      = await fetchWithRetry(`${SHEETS_URL}?action=getIncome`);
+            const monthlyFixedRes= await fetchWithRetry(`${SHEETS_URL}?action=getAllMonthlyFixed`);
 
             // Processar meta
             if (metaRes.ok) {
@@ -1323,7 +1321,16 @@
         }, 1000);
     }
 
+    // Set de IDs em trânsito — evita envios duplicados mesmo com clicks rápidos
+    const _inFlightIds = new Set();
+
     async function addExpenseToSheets(expense) {
+        const expId = String(expense.id);
+        if (_inFlightIds.has(expId)) {
+            console.warn('⚠️ Request duplicado ignorado para id:', expId);
+            return false;
+        }
+        _inFlightIds.add(expId);
         const url = `${SHEETS_URL}?action=addDespesa&id=${expense.id}&amount=${expense.amount}&date=${encodeURIComponent(expense.date)}&time=${encodeURIComponent(expense.time)}&merchant=${encodeURIComponent(expense.merchant)}&category=${encodeURIComponent(expense.category || 'outros')}&obs=${encodeURIComponent(expense.obs || '')}`;
         
         try {
@@ -2246,7 +2253,6 @@
         // Sempre reabilitar o botão e liberar o lock
         clearTimeout(_savingTimeout);
         state.saving = false;
-        render(); // Re-render para reactivar o botão correctamente
 
         if (success) {
             // ✅ OTIMIZAÇÃO: Atualizar state localmente sem recarregar
@@ -2258,9 +2264,10 @@
             state.sms = '';
             state.obs = '';
             state.selectedCategory = null;
-            render();
+            render(); // Único render após tudo concluído
             showToast(t('despesaSalva'));
         } else {
+            render(); // Reactivar botão em caso de erro
             showToast(t('erroSalvar'), 'error');
         }
     }
